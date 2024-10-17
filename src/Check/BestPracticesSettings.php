@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @file
  * Contains Drupal\site_audit\Plugin\SiteAuditCheck\BestPracticesSettings
@@ -11,33 +12,38 @@ use SiteAudit\SiteAuditCheckBase;
 /**
  * Provides the BestPracticesSettings Check.
  */
-class BestPracticesSettings extends SiteAuditCheckBase {
+class BestPracticesSettings extends SiteAuditCheckBase
+{
 
   /**
    * {@inheritdoc}.
    */
-  public function getId() {
+  public function getId()
+  {
     return 'best_practices_settings';
   }
 
   /**
    * {@inheritdoc}.
    */
-  public function getLabel() {
+  public function getLabel()
+  {
     return $this->t('sites/default/settings.php');
   }
 
   /**
    * {@inheritdoc}.
    */
-  public function getDescription() {
+  public function getDescription()
+  {
     return $this->t("Check if the configuration file exists.");
   }
 
   /**
    * {@inheritdoc}.
    */
-  public function getReportId() {
+  public function getReportId()
+  {
     return 'best_practices';
   }
 
@@ -54,21 +60,24 @@ class BestPracticesSettings extends SiteAuditCheckBase {
   /**
    * {@inheritdoc}.
    */
-  public function getResultPass() {
+  public function getResultPass()
+  {
     return $this->t('settings.php exists and is not a symbolic link.');
   }
 
   /**
    * {@inheritdoc}.
    */
-  public function getResultWarn() {
+  public function getResultWarn()
+  {
     return $this->t('sites/default/settings.php is a symbolic link.');
   }
 
   /**
    * {@inheritdoc}.
    */
-  public function getAction() {
+  public function getAction()
+  {
     if ($this->score == SiteAuditCheckBase::AUDIT_CHECK_SCORE_WARN) {
       return $this->t('Don\'t rely on symbolic links for core configuration files; copy settings.php where it should be and remove the symbolic link.');
     }
@@ -80,9 +89,10 @@ class BestPracticesSettings extends SiteAuditCheckBase {
   /**
    * {@inheritdoc}.
    */
-  public function calculateScore() {
-    $settings_path = $this->isDrupal7() 
-      ? $this->getDrupal7SettingsPath() 
+  public function calculateScore()
+  {
+    $settings_path = $this->isDrupal7()
+      ? $this->getDrupal7SettingsPath()
       : $this->getDrupal8SettingsPath();
 
     if (file_exists($settings_path)) {
@@ -100,18 +110,19 @@ class BestPracticesSettings extends SiteAuditCheckBase {
    * @return string
    *   The path to settings.php for Drupal 7.
    */
-  protected function getDrupal7SettingsPath() {
-    return conf_path() . '/settings.php';
+  protected function getDrupal7SettingsPath()
+  {
+    return DRUPAL_ROOT . '/sites/default/settings.php';
   }
 
   /**
    * Get the settings.php path for Drupal 8+.
    *
    * @return string
-   *   The path to settings.
+   *   The path to settings.php for Drupal 8+.
    */
   protected function getDrupal8SettingsPath() {
-    return DRUPAL_ROOT .
+    return \Drupal::root() . '/sites/default/settings.php';
   }
 
 }
