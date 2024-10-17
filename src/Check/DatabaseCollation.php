@@ -98,6 +98,11 @@ class DatabaseCollation extends SiteAuditCheckBase
       $connection = $this->getDatabaseConnection();
       $query = $this->getCollationQuery($connection);
       $result = $query->execute();
+
+      if ($result === FALSE) {
+        throw new \Exception('Query execution failed.');
+      }
+
       $count = 0;
       $warn = FALSE;
       while ($row = $result->fetchAssoc()) {
@@ -120,7 +125,7 @@ class DatabaseCollation extends SiteAuditCheckBase
         return SiteAuditCheckBase::AUDIT_CHECK_SCORE_WARN;
       }
       return SiteAuditCheckBase::AUDIT_CHECK_SCORE_INFO;
-    } catch (Exception $e) {
+    } catch (\Exception $e) {
       return SiteAuditCheckBase::AUDIT_CHECK_SCORE_FAIL;
     }
   }
