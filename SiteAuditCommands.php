@@ -62,26 +62,15 @@ class SiteAuditCommands extends DrushCommands
      * @usage drush audit:reports --format=json
      * @usage drush audit:reports --markdown
      *
-     * @param string $param A parameter
+     * @param array $options
      * @return array
      *
      * @bootstrap full
      *
      * Combine all of our reports
      */
-    public function auditReports(
-        $param = '',
-        $options = [
-            'format' => 'json',
-            'html' => false,
-            'json' => false,
-            'markdown' => false,
-            'detail' => false,
-            'vendor' => '',
-            'skip' => [],
-            'env-vars' => false,
-        ]
-    ) {
+    public function auditReports($options = ['format' => 'json', 'html' => false, 'json' => false, 'markdown' => false, 'detail' => false, 'vendor' => '', 'skip' => [], 'env-vars' => false])
+    {
         $this->init();
 
         $settings_excludes = \Drupal::config('site_audit')->get('opt_out');
@@ -89,10 +78,14 @@ class SiteAuditCommands extends DrushCommands
 
         // The skip parameter is almost always an array, even when the single
         // value is a list of options.
-        if (is_array($options['skip']) && count($options['skip']) == 1) {
-            $skipped = explode(',', $options['skip'][0]);
-        } elseif (is_string($options['skip'])) {
-            $skipped = explode(',', $options['skip']);
+        if (isset($options['skip'])) {
+            if (is_array($options['skip']) && count($options['skip']) == 1) {
+                $skipped = explode(',', $options['skip'][0]);
+            } elseif (is_string($options['skip'])) {
+                $skipped = explode(',', $options['skip']);
+            } elseif (is_array($options['skip'])) {
+                $skipped = $options['skip'];
+            }
         }
 
         if (!empty($settings_excludes)) {
@@ -109,18 +102,18 @@ class SiteAuditCommands extends DrushCommands
             $result['database_size_info'] = $dbSizeInfo;
         }
 
-        if ($options['json']) {
+        if (!empty($options['json'])) {
             print json_encode($result, JSON_PRETTY_PRINT);
             return null;
         }
 
-        if ($options['html']) {
+        if (!empty($options['html'])) {
             print $this->generateHtmlReport($result);
             return null;
         }
 
-        if ($options['markdown']) {
-            $markdown = $this->generateMarkdownReport($result, $options['env-vars']);
+        if (!empty($options['markdown'])) {
+            $markdown = $this->generateMarkdownReport($result, !empty($options['env-vars']));
             print $markdown;
             return null;
         }
@@ -132,13 +125,13 @@ class SiteAuditCommands extends DrushCommands
     /**
      * @hook option audit:reports
      */
-    public function optionEnvVars(&$options) {
+    public function optionEnvVars(array &$options)
+    {
         $options['env-vars'] = [
             'description' => 'Include environment variables report.',
             'default' => false,
         ];
     }
-
     /**
      * @command audit:best-practices
      * @aliases audit_best_practices,abp
