@@ -54,10 +54,10 @@ class UsersCountBlocked extends SiteAuditCheckBase {
     switch ($this->registry->count_users_blocked) {
       case 0:
         return $this->t('There are no blocked users.');
-      break;
-    default:
-      return $this->formatPlural($this->registry->count_users_blocked, 'There is one blocked user.', 'There are @count blocked users.');
-      break;
+      case 1:
+        return $this->t('There is one blocked user.');
+      default:
+        return $this->t('There are @count blocked users.', ['@count' => $this->registry->count_users_blocked]);
     }
   }
 
@@ -87,7 +87,7 @@ class UsersCountBlocked extends SiteAuditCheckBase {
       $query->addExpression('COUNT(*)', 'count');
       $this->registry->count_users_blocked = $query->execute()->fetchField();
     } else {
-      $query = Database::getConnection()->select('users_field_data', 'ufd');
+      $query = \Drupal::database()->select('users_field_data', 'ufd');
       $query->addExpression('COUNT(*)', 'count');
       $query->condition('uid', 0, '>');
       $query->condition('status', 0);
@@ -96,4 +96,13 @@ class UsersCountBlocked extends SiteAuditCheckBase {
     return SiteAuditCheckBase::AUDIT_CHECK_SCORE_INFO;
   }
 
+  /**
+   * Check if the current Drupal version is 7.
+   *
+   * @return bool
+   *   TRUE if Drupal 7, FALSE otherwise.
+   */
+  protected function isDrupal7() {
+    return version_compare(VERSION, '8.0', '<');
+  }
 }
