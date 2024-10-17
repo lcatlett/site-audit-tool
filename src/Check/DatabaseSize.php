@@ -161,8 +161,9 @@ class DatabaseSize extends SiteAuditCheckBase
   protected function getDatabaseSize($connection)
   {
     if ($this->isDrupal7()) {
+      $database_name = db_select('default')->getDatabase();
       $query = db_query("SELECT SUM(data_length + index_length) FROM information_schema.TABLES WHERE table_schema = :database", [
-        ':database' => $connection->getConnectionOptions()['database'],
+        ':database' => $database_name,
       ]);
       return (float) $query->fetchField();
     } else {
@@ -185,8 +186,9 @@ class DatabaseSize extends SiteAuditCheckBase
   protected function getCacheTablesSize($connection)
   {
     if ($this->isDrupal7()) {
+      $database_name = db_select('default')->getDatabase();
       $query = db_query("SELECT SUM(data_length + index_length) FROM information_schema.TABLES WHERE table_schema = :database AND table_name LIKE 'cache%'", [
-        ':database' => $connection->getConnectionOptions()['database'],
+        ':database' => $database_name,
       ]);
       return (float) $query->fetchField();
     } else {
