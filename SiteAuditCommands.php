@@ -697,6 +697,14 @@ class SiteAuditCommands extends DrushCommands
         $markdown = "# Site Audit Report\n\n";
         $markdown .= "Generated on: " . date('Y-m-d H:i:s', $result['time']) . "\n\n";
 
+        // Add environment information
+        $markdown .= "## Environment Information\n\n";
+        $markdown .= "| Key | Value |\n";
+        $markdown .= "|-----|-------|\n";
+        $markdown .= "| Environment | " . $this->getEnvironment() . " |\n";
+        $markdown .= "| Drush Alias | " . $this->getDrushAlias() . " |\n";
+        $markdown .= "| Site URI | " . $this->getSiteUri() . " |\n\n";
+
         foreach ($result['reports'] as $reportKey => $report) {
             $markdown .= "## " . $report['label'] . "\n\n";
             $markdown .= "Overall Score: " . $report['percent'] . "%\n\n";
@@ -734,5 +742,24 @@ class SiteAuditCommands extends DrushCommands
             default:
                 return "Unknown";
         }
+    }
+
+    // Add these new protected methods to get the required information
+    protected function getEnvironment()
+    {
+        // You may need to adjust this based on how you determine the environment
+        return getenv('AH_SITE_ENVIRONMENT') ?: 'Unknown';
+    }
+
+    protected function getDrushAlias()
+    {
+        // You may need to adjust this based on how you retrieve the Drush alias
+        return drush_get_context('DRUSH_ALIAS') ?: 'None';
+    }
+
+    protected function getSiteUri()
+    {
+        // You may need to adjust this based on how you retrieve the site URI
+        return \Drupal::request()->getSchemeAndHttpHost() . \Drupal::request()->getBaseUrl();
     }
 }
