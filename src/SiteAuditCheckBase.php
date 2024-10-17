@@ -2,333 +2,339 @@
 
 namespace SiteAudit;
 
-if (!class_exists('\Drupal')) {
-    // Drupal 7 compatibility
-    abstract class SiteAuditCheckBase implements SiteAuditCheckInterface {
-        // Drupal 7 specific implementation
-        protected function t($string, array $args = array(), array $options = array()) {
-            return t($string, $args, $options);
-        }
-    }
-} else {
-    // Drupal 8+ compatibility
-    use Drupal\Core\StringTranslation\StringTranslationTrait;
-
-    abstract class SiteAuditCheckBase implements SiteAuditCheckInterface {
-        use StringTranslationTrait;
-    }
-}
+use Drupal\Core\StringTranslation\StringTranslationTrait;
 
 /**
  * Base class for Site Audit Check plugins.
  */
 abstract class SiteAuditCheckBase implements SiteAuditCheckInterface {
+    use StringTranslationTrait;
 
-  const AUDIT_CHECK_SCORE_INFO = 3;
-  const AUDIT_CHECK_SCORE_PASS = 2;
-  const AUDIT_CHECK_SCORE_WARN = 1;
-  const AUDIT_CHECK_SCORE_FAIL = 0;
+    const AUDIT_CHECK_SCORE_INFO = 3;
+    const AUDIT_CHECK_SCORE_PASS = 2;
+    const AUDIT_CHECK_SCORE_WARN = 1;
+    const AUDIT_CHECK_SCORE_FAIL = 0;
 
-  /**
-   * Quantifiable number associated with result on a scale of 0 to 2.
-   *
-   * @var int
-   */
-  protected $score;
+    /**
+     * Quantifiable number associated with result on a scale of 0 to 2.
+     *
+     * @var int
+     */
+    protected $score;
 
-  /**
-   * Names of checks that should not run as a result of this check.
-   *
-   * @var array
-   */
-  protected $abort = [];
+    /**
+     * Names of checks that should not run as a result of this check.
+     *
+     * @var array
+     */
+    protected $abort = [];
 
-  /**
-   * User has opted out of this check in configuration.
-   *
-   * @var bool
-   */
-  protected $optOut = FALSE;
+    /**
+     * User has opted out of this check in configuration.
+     *
+     * @var bool
+     */
+    protected $optOut = FALSE;
 
-  /**
-   * If set, will override the Report's percentage.
-   *
-   * @var int
-   */
-  protected $percentOverride;
+    /**
+     * If set, will override the Report's percentage.
+     *
+     * @var int
+     */
+    protected $percentOverride;
 
-  /**
-   * Use for passing data between checks within a report.
-   *
-   * @var \stdClass
-   */
-  protected $registry;
+    /**
+     * Use for passing data between checks within a report.
+     *
+     * @var \stdClass
+     */
+    protected $registry;
 
-  /**
-   * are we in a static context
-   *
-   * @var boolean
-   */
-  protected $static = TRUE;
+    /**
+     * are we in a static context
+     *
+     * @var boolean
+     */
+    protected $static = TRUE;
 
-  /**
-   * options passed in for reports and checks
-   *
-   * @var array
-   */
-  protected $options = [];
+    /**
+     * options passed in for reports and checks
+     *
+     * @var array
+     */
+    protected $options = [];
 
-  /**
-   * Constructor.
-   *
-   * @param array $registry
-   *   Aggregates data from each individual check.
-   * @param array $options
-   *   Options.
-   * @param mixed $opt_out
-   *   Array of all skipped tests, or true if this test should be skipped.
-   */
-  public function __construct($registry, $options = [], $opt_out = false) {
-    $this->registry = $registry;
-    $this->options = $options;
+    /**
+     * Constructor.
+     *
+     * @param array $registry
+     *   Aggregates data from each individual check.
+     * @param array $options
+     *   Options.
+     * @param mixed $opt_out
+     *   Array of all skipped tests, or true if this test should be skipped.
+     */
+    public function __construct($registry, $options = [], $opt_out = false) {
+        $this->registry = $registry;
+        $this->options = $options;
 
-    if ($opt_out === true) {
-      $this->optOut = true;
-    }
-    elseif (is_array($opt_out) && !empty($opt_out)) {
-      $classname = (new \ReflectionClass($this))->getShortName();
-      $this->optOut = in_array($classname, $opt_out);
-    }
+        if ($opt_out === true) {
+            $this->optOut = true;
+        }
+        elseif (is_array($opt_out) && !empty($opt_out)) {
+            $classname = (new \ReflectionClass($this))->getShortName();
+            $this->optOut = in_array($classname, $opt_out);
+        }
 
-    if ($this->optOut) {
-      $this->score = SiteAuditCheckBase::AUDIT_CHECK_SCORE_INFO;
-    }
-    $static = FALSE;
+        if ($this->optOut) {
+            $this->score = SiteAuditCheckBase::AUDIT_CHECK_SCORE_INFO;
+        }
+        $static = FALSE;
 
-    // Not ideal, but store a reference to ourself in the registry checks list
-    $this->registry->checksList->add($this);
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getResult() {
-    if ($this->optOut) {
-      return t('Opted-out in site configuration or settings.php file.');
-    }
-    switch ($this->score) {
-      case SiteAuditCheckBase::AUDIT_CHECK_SCORE_PASS:
-        return $this->getResultPass();
-
-      case SiteAuditCheckBase::AUDIT_CHECK_SCORE_WARN:
-        return $this->getResultWarn();
-
-      case SiteAuditCheckBase::AUDIT_CHECK_SCORE_INFO:
-        return $this->getResultInfo();
-
-      default:
-        return $this->getResultFail();
-    }
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getScoreLabel() {
-    switch ($this->score) {
-      case SiteAuditCheckBase::AUDIT_CHECK_SCORE_PASS:
-        return $this->t('Pass');
-
-      case SiteAuditCheckBase::AUDIT_CHECK_SCORE_WARN:
-        return $this->t('Warning');
-
-      case SiteAuditCheckBase::AUDIT_CHECK_SCORE_INFO:
-        return $this->t('Information');
-
-      default:
-        return $this->t('Blocker');
-
-    }
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  abstract public function getId();
-
-  /**
-   * {@inheritdoc}
-   */
-  abstract public function getLabel();
-
-  /**
-   * {@inheritdoc}
-   */
-  abstract public function getDescription();
-
-  /**
-   * {@inheritdoc}
-   */
-  abstract public function getReportId();
-
-  /**
-   * {@inheritdoc}
-   */
-  abstract public function getResultFail();
-
-  /**
-   * {@inheritdoc}
-   */
-  abstract public function getResultInfo();
-
-  /**
-   * {@inheritdoc}
-   */
-  abstract public function getResultPass();
-
-  /**
-   * {@inheritdoc}
-   */
-  abstract public function getResultWarn();
-
-  /**
-   * {@inheritdoc}
-   */
-  abstract public function getAction();
-
-  /**
-   * {@inheritdoc}
-   */
-  public function renderAction() {
-    if ($this->optOut) {
-      return '';
-    }
-    return $this->getAction();
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  abstract public function calculateScore();
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getScore() {
-    if (!isset($this->score)) {
-      $this->score = $this->calculateScore();
-    }
-    return $this->score;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getRegistry() {
-    return $this->registry;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function shouldAbort() {
-    return $this->abort;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getPercentOverride() {
-    return $this->percentOverride;
-  }
-
-  /**
-   * invoke another check's calculateScore() method if it is needed
-   */
-  protected function checkInvokeCalculateScore($id) {
-    $this->registry->checksList->checkInvokeCalculateScore($id);
-  }
-
-  protected function simpleList($list, $listType = 'ul') {
-    if ($this->registry->html) {
-      return $this->simpleHtmlList($list, $listType);
-    }
-    $ret_val = '';
-    foreach ($list as $value) {
-      $ret_val .= '- ' . $value . PHP_EOL;
-    }
-    return $ret_val;
-  }
-
-  private function simpleHtmlList($list, $listType = 'ul') {
-    $ret_val = "<$listType>";
-    foreach ($list as $value) {
-      $ret_val .= '<li>' . $value . '</li>';
-    }
-    $ret_val .= "</$listType>";
-
-    return $ret_val;
-  }
-
-  protected function simpleKeyValueList($keyHeader, $valueHeader, $list) {
-    if ($this->registry->html) {
-      return $this->simpleHtmlKeyValueList($keyHeader, $valueHeader, $list);
+        // Not ideal, but store a reference to ourself in the registry checks list
+        $this->registry->checksList->add($this);
     }
 
-    $ret_val  = $keyHeader . ': ' . $valueHeader . PHP_EOL;
-    $ret_val .= str_repeat('-', strlen($keyHeader) + strlen($valueHeader) + 2);
-    foreach ($list as $key => $value) {
-      $ret_val .= PHP_EOL;
-      $ret_val .= "$key: $value";
+    /**
+     * {@inheritdoc}
+     */
+    public function getResult() {
+        if ($this->optOut) {
+            return $this->t('Opted-out in site configuration or settings.php file.');
+        }
+        switch ($this->score) {
+            case SiteAuditCheckBase::AUDIT_CHECK_SCORE_PASS:
+                return $this->getResultPass();
+
+            case SiteAuditCheckBase::AUDIT_CHECK_SCORE_WARN:
+                return $this->getResultWarn();
+
+            case SiteAuditCheckBase::AUDIT_CHECK_SCORE_INFO:
+                return $this->getResultInfo();
+
+            default:
+                return $this->getResultFail();
+        }
     }
-    return $ret_val;
-  }
 
-  private function simpleHtmlKeyValueList($keyHeader, $valueHeader, $list) {
-    $ret_val = '<table class="table table-condensed">';
-    $ret_val .= "<thead><tr><th>$keyHeader</th><th>$valueHeader</th></tr></thead>";
-    $ret_val .= '<tbody>';
-    foreach ($list as $key => $value) {
-      $ret_val .= "<tr><td>$key</td><td>$value</td></tr>";
+    /**
+     * {@inheritdoc}
+     */
+    public function getScoreLabel() {
+        switch ($this->score) {
+            case SiteAuditCheckBase::AUDIT_CHECK_SCORE_PASS:
+                return $this->t('Pass');
+
+            case SiteAuditCheckBase::AUDIT_CHECK_SCORE_WARN:
+                return $this->t('Warning');
+
+            case SiteAuditCheckBase::AUDIT_CHECK_SCORE_INFO:
+                return $this->t('Information');
+
+            default:
+                return $this->t('Blocker');
+
+        }
     }
-    $ret_val .= '</tbody>';
-    $ret_val .= '</table>';
 
-    return $ret_val;
-  }
+    /**
+     * {@inheritdoc}
+     */
+    abstract public function getId();
 
-  protected function linebreak() {
-    if ($this->registry->html) {
-      return '<br/>';
+    /**
+     * {@inheritdoc}
+     */
+    abstract public function getLabel();
+
+    /**
+     * {@inheritdoc}
+     */
+    abstract public function getDescription();
+
+    /**
+     * {@inheritdoc}
+     */
+    abstract public function getReportId();
+
+    /**
+     * {@inheritdoc}
+     */
+    abstract public function getResultFail();
+
+    /**
+     * {@inheritdoc}
+     */
+    abstract public function getResultInfo();
+
+    /**
+     * {@inheritdoc}
+     */
+    abstract public function getResultPass();
+
+    /**
+     * {@inheritdoc}
+     */
+    abstract public function getResultWarn();
+
+    /**
+     * {@inheritdoc}
+     */
+    abstract public function getAction();
+
+    /**
+     * {@inheritdoc}
+     */
+    public function renderAction() {
+        if ($this->optOut) {
+            return '';
+        }
+        return $this->getAction();
     }
-    return PHP_EOL;
-  }
 
-  protected function rowsToKeyValueList($rows) {
-    return array_map(
-      function ($item) {
-        return (string)$item;
-      },
-      array_column($rows, 1, 0)
-    );
-  }
+    /**
+     * {@inheritdoc}
+     */
+    abstract public function calculateScore();
 
-  protected function isDrupal7()
-  {
-    return !class_exists('\Drupal');
-  }
-
-  /**
-   * Get the Drupal root directory.
-   *
-   * @return string
-   */
-  protected function getDrupalRoot() {
-    if ($this->isDrupal7()) {
-      return DRUPAL_ROOT;
-    } else {
-      return \Drupal::root();
+    /**
+     * {@inheritdoc}
+     */
+    public function getScore() {
+        if (!isset($this->score)) {
+            $this->score = $this->calculateScore();
+        }
+        return $this->score;
     }
-  }
 
+    /**
+     * {@inheritdoc}
+     */
+    public function getRegistry() {
+        return $this->registry;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function shouldAbort() {
+        return $this->abort;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getPercentOverride() {
+        return $this->percentOverride;
+    }
+
+    /**
+     * invoke another check's calculateScore() method if it is needed
+     */
+    protected function checkInvokeCalculateScore($id) {
+        $this->registry->checksList->checkInvokeCalculateScore($id);
+    }
+
+    protected function simpleList($list, $listType = 'ul') {
+        if ($this->registry->html) {
+            return $this->simpleHtmlList($list, $listType);
+        }
+        $ret_val = '';
+        foreach ($list as $value) {
+            $ret_val .= '- ' . $value . PHP_EOL;
+        }
+        return $ret_val;
+    }
+
+    private function simpleHtmlList($list, $listType = 'ul') {
+        $ret_val = "<$listType>";
+        foreach ($list as $value) {
+            $ret_val .= '<li>' . $value . '</li>';
+        }
+        $ret_val .= "</$listType>";
+
+        return $ret_val;
+    }
+
+    protected function simpleKeyValueList($keyHeader, $valueHeader, $list) {
+        if ($this->registry->html) {
+            return $this->simpleHtmlKeyValueList($keyHeader, $valueHeader, $list);
+        }
+
+        $ret_val  = $keyHeader . ': ' . $valueHeader . PHP_EOL;
+        $ret_val .= str_repeat('-', strlen($keyHeader) + strlen($valueHeader) + 2);
+        foreach ($list as $key => $value) {
+            $ret_val .= PHP_EOL;
+            $ret_val .= "$key: $value";
+        }
+        return $ret_val;
+    }
+
+    private function simpleHtmlKeyValueList($keyHeader, $valueHeader, $list) {
+        $ret_val = '<table class="table table-condensed">';
+        $ret_val .= "<thead><tr><th>$keyHeader</th><th>$valueHeader</th></tr></thead>";
+        $ret_val .= '<tbody>';
+        foreach ($list as $key => $value) {
+            $ret_val .= "<tr><td>$key</td><td>$value</td></tr>";
+        }
+        $ret_val .= '</tbody>';
+        $ret_val .= '</table>';
+
+        return $ret_val;
+    }
+
+    protected function linebreak() {
+        if ($this->registry->html) {
+            return '<br/>';
+        }
+        return PHP_EOL;
+    }
+
+    protected function rowsToKeyValueList($rows) {
+        return array_map(
+            function ($item) {
+                return (string)$item;
+            },
+            array_column($rows, 1, 0)
+        );
+    }
+
+    protected function isDrupal7()
+    {
+        return !class_exists('\Drupal');
+    }
+
+    /**
+     * Get the Drupal root directory.
+     *
+     * @return string
+     */
+    protected function getDrupalRoot() {
+        if ($this->isDrupal7()) {
+            return DRUPAL_ROOT;
+        } else {
+            return \Drupal::root();
+        }
+    }
+
+    /**
+     * Translation function compatible with both Drupal 7 and Drupal 8+.
+     *
+     * @param string $string
+     *   The string to translate.
+     * @param array $args
+     *   An associative array of replacements to make.
+     * @param array $options
+     *   An associative array of additional options.
+     *
+     * @return string
+     *   The translated string.
+     */
+    protected function t($string, array $args = array(), array $options = array()) {
+        if ($this->isDrupal7()) {
+            return t($string, $args, $options);
+        } else {
+            return $this->formatPlural(1, $string, $string, $args, $options);
+        }
+    }
 }
