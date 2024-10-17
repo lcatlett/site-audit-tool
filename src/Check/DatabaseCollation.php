@@ -153,11 +153,9 @@ class DatabaseCollation extends SiteAuditCheckBase
   {
     if ($this->isDrupal7()) {
       $database_name = $this->getDatabaseName();
-      $query = db_select('information_schema.TABLES', 'ist');
-      $query->addField('ist', 'TABLE_NAME', 'name');
-      $query->addField('ist', 'TABLE_COLLATION', 'collation');
-      $query->condition('ist.TABLE_COLLATION', array('utf8_general_ci', 'utf8_unicode_ci', 'utf8_bin', 'utf8mb4_general_ci'), 'NOT IN');
-      $query->condition('ist.table_schema', $database_name);
+      $query = db_query("SELECT TABLE_NAME AS name, TABLE_COLLATION AS collation FROM information_schema.TABLES WHERE TABLE_SCHEMA = :database AND TABLE_COLLATION NOT IN ('utf8_general_ci', 'utf8_unicode_ci', 'utf8_bin', 'utf8mb4_general_ci')", [
+        ':database' => $database_name,
+      ]);
       return $query;
     } else {
       $query = $connection->select('information_schema.TABLES', 'ist');
