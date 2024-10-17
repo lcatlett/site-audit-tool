@@ -56,8 +56,12 @@ class BestPracticesServices extends SiteAuditCheckBase {
    * {@inheritdoc}
    */
   public function getResult() {
+    if ($this->isDrupal7()) {
+      return $this->t('This check is not applicable for Drupal 7.');
+    }
+
     if ($this->optOut) {
-      return t('Opted-out in site configuration or settings.php file.');
+      return $this->t('Opted-out in site configuration or settings.php file.');
     }
 
     if (file_exists(DRUPAL_ROOT . '/sites/default/services.yml')) {

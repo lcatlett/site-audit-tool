@@ -61,7 +61,7 @@ class ViewsCount extends SiteAuditCheckBase {
       return $this->t('There are no enabled views.');
     }
     return $this->t('There are @count_views enabled views.', array(
-      '@count_views' => count($this->registry->views),
+      '@count_views' => $views_count,
     ));
   }
 
@@ -85,12 +85,23 @@ class ViewsCount extends SiteAuditCheckBase {
    * {@inheritdoc}.
    */
   public function calculateScore() {
-
     $this->registry->views = [];
 
-    if (\Drupal::moduleHandler()->moduleExists('views')) {
-      foreach (Views::getEnabledViews() as $view) {
-        $this->registry->views[] = $view;
+    if ($this->isDrupal7()) {
+      if (module_exists('views')) {
+        $views = views_get_all_views();
+        foreach ($views as $view) {
+          if (!empty($view->disabled)) {
+            continue;
+          }
+          $this->registry->views[] = $view;
+        }
+      }
+    } else {
+      if (\Drupal::moduleHandler()->moduleExists('views')) {
+        foreach (Views::getEnabledViews() as $view) {
+          $this->registry->views[] = $view;
+        }
       }
     }
 
@@ -101,4 +112,13 @@ class ViewsCount extends SiteAuditCheckBase {
     return SiteAuditCheckBase::AUDIT_CHECK_SCORE_PASS;
   }
 
+  /**
+   * Check if the current Drupal version is 7.
+   *
+   * @return bool
+   *   TRUE if Drupal 7, FALSE otherwise.
+   */
+  protected function isDrupal7() {
+    return version_compare(drush_drupal_version(), '8.0', '<');
+  }
 }

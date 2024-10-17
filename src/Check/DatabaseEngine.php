@@ -81,8 +81,14 @@ class DatabaseEngine extends SiteAuditCheckBase {
    * {@inheritdoc}.
    */
   public function calculateScore() {
-    $connection = \Drupal\Core\Database\Database::getConnection();
-    $query = Database::getConnection()->select('information_schema.TABLES', 'ist');
+    if ($this->isDrupal7()) {
+      $connection = Database::getConnection();
+      $query = $connection->select('information_schema.TABLES', 'ist');
+    }
+    else {
+      $connection = \Drupal\Core\Database\Database::getConnection();
+      $query = Database::getConnection()->select('information_schema.TABLES', 'ist');
+    }
     $query->addField('ist', 'TABLE_NAME', 'name');
     $query->addField('ist', 'ENGINE', 'engine');
     $query->condition('ist.ENGINE', 'InnoDB', '<>');

@@ -7,7 +7,6 @@
 namespace SiteAudit\Check;
 
 use SiteAudit\SiteAuditCheckBase;
-use Drupal\Core\Logger\RfcLogLevel;
 
 /**
  * Provides the WatchdogSyslog Check.
@@ -84,7 +83,7 @@ class WatchdogSyslog extends SiteAuditCheckBase {
    * {@inheritdoc}.
    */
   public function calculateScore() {
-    $this->registry->syslog_enabled = \Drupal::moduleHandler()->moduleExists('syslog');
+    $this->registry->syslog_enabled = $this->isSyslogEnabled();
     if ($this->registry->syslog_enabled) {
       if ($this->registry->vendor == 'pantheon') {
         return SiteAuditCheckBase::AUDIT_CHECK_SCORE_FAIL;
@@ -93,4 +92,17 @@ class WatchdogSyslog extends SiteAuditCheckBase {
     return SiteAuditCheckBase::AUDIT_CHECK_SCORE_INFO;
   }
 
+  /**
+   * Check if syslog module is enabled.
+   *
+   * @return bool
+   *   TRUE if syslog is enabled, FALSE otherwise.
+   */
+  protected function isSyslogEnabled() {
+    if ($this->isDrupal7()) {
+      return module_exists('syslog');
+    } else {
+      return \Drupal::moduleHandler()->moduleExists('syslog');
+    }
+  }
 }

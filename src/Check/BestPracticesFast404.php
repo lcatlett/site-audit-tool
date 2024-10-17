@@ -78,9 +78,17 @@ class BestPracticesFast404 extends SiteAuditCheckBase {
    * {@inheritdoc}.
    */
   public function calculateScore() {
-    $config = \Drupal::config('system.performance');
-    if ($config->get('fast_404.enabled') && trim($config->get('fast_404.paths')) != '') {
-      return SiteAuditCheckBase::AUDIT_CHECK_SCORE_PASS;
+    if ($this->isDrupal7()) {
+      $fast_404 = variable_get('fast_404_html', FALSE);
+      if ($fast_404) {
+        return SiteAuditCheckBase::AUDIT_CHECK_SCORE_PASS;
+      }
+    }
+    else {
+      $config = \Drupal::config('system.performance');
+      if ($config->get('fast_404.enabled') && trim($config->get('fast_404.paths')) != '') {
+        return SiteAuditCheckBase::AUDIT_CHECK_SCORE_PASS;
+      }
     }
     return SiteAuditCheckBase::AUDIT_CHECK_SCORE_WARN;
   }

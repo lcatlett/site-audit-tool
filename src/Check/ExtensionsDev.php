@@ -100,43 +100,39 @@ class ExtensionsDev extends SiteAuditCheckBase {
    * {@inheritdoc}.
    */
   public function calculateScore() {
-    if (!isset($this->registry->extensions) || empty($this->registry->extensions)) {
-      $moduleHandler = \Drupal::service('module_handler');
-      $this->registry->extensions = $modules = \Drupal::service('extension.list.module')->reset()->getList();
-      uasort($this->registry->extensions, 'system_sort_modules_by_info_name');
-    }
-    $this->registry->extensions_dev = array();
-    $extension_info = $this->registry->extensions;
-    //uasort($extension_info, '_drush_pm_sort_extensions');
-    $dev_extensions = $this->getExtensions();
-    foreach ($extension_info as $key => $extension) {
-      $row = array();
-      // Not in the list of known development modules.
-      if (!array_key_exists($extension->getName(), $dev_extensions)) {
-        unset($extension_info[$key]);
-        continue;
-      }
+    $dev_modules = array(
+        'devel',
+        'devel_generate',
+        'devel_node_access',
+        'update',
+        'dblog',
+        'field_ui',
+        'views_ui',
+    );
 
-      // Do not report modules that are dependencies of other modules, such
-      // as field_ui in Drupal Commerce.
-      if (isset($extension->required_by) && !empty($extension->required_by)) {
-        unset($extension_info[$key]);
-        continue;
-      }
+    $enabled_dev_modules = [];
 
-      // Name.
-      $row[] = $extension->getName();
-      // Reason.
-      $row[] = $dev_extensions[$extension->getName()];
-
-      $this->registry->extensions_dev[$extension->getName()] = $row;
+    if ($this->isDrupal7()) {
+        $modules = module_list();
+        foreach ($dev_modules as $dev_module) {
+            if (isset($modules[$dev_module])) {
+                $enabled_dev_modules[] = $dev_module;
+            }
+        }
+    } else {
+        $modules = \Drupal::moduleHandler()->getModuleList();
+        foreach ($dev_modules as $dev_module) {
+            if (isset($modules[$dev_module])) {
+                $enabled_dev_modules[] = $dev_module;
+            }
+        }
     }
 
-    if (!empty($this->registry->extensions_dev)) {
-      if (SiteAuditEnvironment::isDev()) {
-        return SiteAuditCheckBase::AUDIT_CHECK_SCORE_INFO;
-      }
-      return SiteAuditCheckBase::AUDIT_CHECK_SCORE_WARN;
+    if (!empty($enabled_dev_modules)) {
+        if (SiteAuditEnvironment::isDev()) {
+            return SiteAuditCheckBase::AUDIT_CHECK_SCORE_INFO;
+        }
+        return SiteAuditCheckBase::AUDIT_CHECK_SCORE_WARN;
     }
     return SiteAuditCheckBase::AUDIT_CHECK_SCORE_PASS;
   }

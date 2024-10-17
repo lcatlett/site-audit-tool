@@ -81,13 +81,37 @@ class BestPracticesSettings extends SiteAuditCheckBase {
    * {@inheritdoc}.
    */
   public function calculateScore() {
-    if (file_exists(DRUPAL_ROOT . '/sites/default/settings.php')) {
-      if (is_link(DRUPAL_ROOT . '/sites/default/settings.php')) {
+    $settings_path = $this->isDrupal7() 
+      ? $this->getDrupal7SettingsPath() 
+      : $this->getDrupal8SettingsPath();
+
+    if (file_exists($settings_path)) {
+      if (is_link($settings_path)) {
         return SiteAuditCheckBase::AUDIT_CHECK_SCORE_WARN;
       }
       return SiteAuditCheckBase::AUDIT_CHECK_SCORE_PASS;
     }
     return SiteAuditCheckBase::AUDIT_CHECK_SCORE_FAIL;
+  }
+
+  /**
+   * Get the settings.php path for Drupal 7.
+   *
+   * @return string
+   *   The path to settings.php for Drupal 7.
+   */
+  protected function getDrupal7SettingsPath() {
+    return conf_path() . '/settings.php';
+  }
+
+  /**
+   * Get the settings.php path for Drupal 8+.
+   *
+   * @return string
+   *   The path to settings.
+   */
+  protected function getDrupal8SettingsPath() {
+    return DRUPAL_ROOT .
   }
 
 }

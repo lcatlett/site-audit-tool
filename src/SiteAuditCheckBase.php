@@ -2,14 +2,27 @@
 
 namespace SiteAudit;
 
-use Drupal\Core\StringTranslation\StringTranslationTrait;
+if (!class_exists('\Drupal')) {
+    // Drupal 7 compatibility
+    abstract class SiteAuditCheckBase implements SiteAuditCheckInterface {
+        // Drupal 7 specific implementation
+        protected function t($string, array $args = array(), array $options = array()) {
+            return t($string, $args, $options);
+        }
+    }
+} else {
+    // Drupal 8+ compatibility
+    use Drupal\Core\StringTranslation\StringTranslationTrait;
+
+    abstract class SiteAuditCheckBase implements SiteAuditCheckInterface {
+        use StringTranslationTrait;
+    }
+}
 
 /**
  * Base class for Site Audit Check plugins.
  */
 abstract class SiteAuditCheckBase implements SiteAuditCheckInterface {
-
-  use StringTranslationTrait;
 
   const AUDIT_CHECK_SCORE_INFO = 3;
   const AUDIT_CHECK_SCORE_PASS = 2;
@@ -303,6 +316,19 @@ abstract class SiteAuditCheckBase implements SiteAuditCheckInterface {
   protected function isDrupal7()
   {
     return !class_exists('\Drupal');
+  }
+
+  /**
+   * Get the Drupal root directory.
+   *
+   * @return string
+   */
+  protected function getDrupalRoot() {
+    if ($this->isDrupal7()) {
+      return DRUPAL_ROOT;
+    } else {
+      return \Drupal::root();
+    }
   }
 
 }

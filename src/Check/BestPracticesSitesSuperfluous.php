@@ -94,7 +94,7 @@ class BestPracticesSitesSuperfluous extends SiteAuditCheckBase {
    */
   public function calculateScore() {
     $this->registry->superfluous = array();
-    $sites_dir = DRUPAL_ROOT . DIRECTORY_SEPARATOR . 'sites';
+    $sites_dir = $this->isDrupal7() ? DRUPAL_ROOT . '/sites' : DRUPAL_ROOT . DIRECTORY_SEPARATOR . 'sites';
     $files = @scandir($sites_dir) ?: array();
     foreach ($files as $file) {
       if (!is_file($sites_dir . DIRECTORY_SEPARATOR . $file)) {
@@ -105,8 +105,8 @@ class BestPracticesSitesSuperfluous extends SiteAuditCheckBase {
         continue;
       }
 
-      if ($file === 'sites.php' && $this->registry->vendor !== 'pantheon') {
-        // Support multi-site directory aliasing for non-Pantheon sites.
+      if ($file === 'sites.php' && (!$this->isDrupal7() && $this->registry->vendor !== 'pantheon')) {
+        // Support multi-site directory aliasing for non-Pantheon sites in Drupal 8+.
         continue;
       }
 
