@@ -8,7 +8,6 @@
 namespace SiteAudit\Check;
 
 use SiteAudit\SiteAuditCheckBase;
-use Drupal\Core\Database\Database;
 
 /**
  * Provides the Database size check.
@@ -116,11 +115,7 @@ class DatabaseSize extends SiteAuditCheckBase
   public function calculateScore()
   {
     try {
-        if ($this->isDrupal7()) {
-            $connection = Database::getConnection();
-        } else {
-            $connection = \Drupal\Core\Database\Database::getConnection();
-        }
+        $connection = $this->getDatabaseConnection();
         $this->totalSize = $this->getDatabaseSize($connection);
         $this->cacheSize = $this->getCacheTablesSize($connection);
 
@@ -140,9 +135,24 @@ class DatabaseSize extends SiteAuditCheckBase
   }
 
   /**
+   * Get the database connection.
+   *
+   * @return \Drupal\Core\Database\Connection|\DatabaseConnection
+   *   The database connection.
+   */
+  protected function getDatabaseConnection()
+  {
+    if ($this->isDrupal7()) {
+      return db_select('default');
+    } else {
+      return \Drupal::database();
+    }
+  }
+
+  /**
    * Get the total database size.
    *
-   * @param \Drupal\Core\Database\Connection $connection
+   * @param \Drupal\Core\Database\Connection|\DatabaseConnection $connection
    *   The database connection.
    *
    * @return float
@@ -159,7 +169,7 @@ class DatabaseSize extends SiteAuditCheckBase
   /**
    * Get the total size of cache tables.
    *
-   * @param \Drupal\Core\Database\Connection $connection
+   * @param \Drupal\Core\Database\Connection|\DatabaseConnection $connection
    *   The database connection.
    *
    * @return float
