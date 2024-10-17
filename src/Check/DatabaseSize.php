@@ -110,6 +110,7 @@ class DatabaseSize extends SiteAuditCheckBase {
 
       $this->registry->cache_size = $result['SUM(ist.data_length + ist.index_length)'];
       $this->registry->cache_count = $result['COUNT(ist.table_name)'];
+      $this->registry->non_cache_size = $this->registry->total_size - $this->registry->cache_size;
       $this->registry->cache_percentage = ($this->registry->cache_size / $this->registry->total_size) * 100;
 
       if ($this->registry->cache_percentage > 20) {
@@ -120,5 +121,20 @@ class DatabaseSize extends SiteAuditCheckBase {
     catch (\Exception $e) {
       return SiteAuditCheckBase::AUDIT_CHECK_SCORE_FAIL;
     }
+  }
+
+  /**
+   * Format a size in bytes to a more human-readable format.
+   *
+   * @param int $size
+   *   The size in bytes.
+   *
+   * @return string
+   *   The formatted size.
+   */
+  private function formatSize($size) {
+    $units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    $power = $size > 0 ? floor(log($size, 1024)) : 0;
+    return number_format($size / pow(1024, $power), 2, '.', ',') . ' ' . $units[$power];
   }
 }
