@@ -7,7 +7,6 @@
 namespace SiteAudit\Check;
 
 use SiteAudit\SiteAuditCheckBase;
-use Drupal\Core\Database\Database;
 
 /**
  * Provides the UsersCountAll Check.
@@ -53,7 +52,9 @@ class UsersCountAll extends SiteAuditCheckBase {
    * {@inheritdoc}.
    */
   public function getResultInfo() {
-    return $this->formatPlural($this->registry->count_users_all, 'There is one user.', 'There are @count users.');
+    return $this->registry->count_users_all == 1
+      ? $this->t('There is one user.')
+      : $this->t('There are @count users.', ['@count' => $this->registry->count_users_all]);
   }
 
   /**
@@ -75,18 +76,15 @@ class UsersCountAll extends SiteAuditCheckBase {
    * {@inheritdoc}.
    */
   public function calculateScore() {
-    if ($this->isDrupal7()) {
-      $query = db_select('users');
-      $query->addExpression('COUNT(*)', 'count');
-      $query->condition('uid', 0, '<>');
-    } else {
-      $query = Database::getConnection()->select('users');
-      $query->addExpression('COUNT(*)', 'count');
-      $query->condition('uid', 0, '<>');
-    }
-
     try {
-      $this->registry->count_users_all = $query->execute()->fetchField();
+      if ($this->isDrupal7()) {
+        $count = db_query("SELECT COUNT(*) FROM {users} WHERE uid <> 0")->fetchField();
+      } else {
+        $count = \Drupal::database()->query("SELECT COUNT(*) FROM {users_field_data} WHERE uid <> 0")->fetchField();
+      }
+
+      $this->registry->count_users_all = $count;
+
       if (!$this->registry->count_users_all) {
         $this->abort = TRUE;
         return SiteAuditCheckBase::AUDIT_CHECK_SCORE_FAIL;
@@ -99,4 +97,13 @@ class UsersCountAll extends SiteAuditCheckBase {
     }
   }
 
+  /**
+   * Check if the current Drupal version is 7.
+   *
+   * @return bool
+   *   TRUE if Drupal 7, FALSE otherwise.
+   */
+  protected function isDrupal7() {
+    return version_compare(VERSION, '8.0', '<');
+  }
 }

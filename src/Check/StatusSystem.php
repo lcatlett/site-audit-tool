@@ -187,7 +187,7 @@ class StatusSystem extends SiteAuditCheckBase {
     if ($this->isDrupal7()) {
       uasort($this->registry->requirements, 'drupal_sort_severity');
     } else {
-      uasort($this->registry->requirements, ['Drupal\Core\Extension\ModuleHandler', 'sortByWeightAndTitle']);
+      uasort($this->registry->requirements, [$this, 'sortRequirements']);
     }
 
     return $this->calculateFinalScore();
@@ -207,7 +207,7 @@ class StatusSystem extends SiteAuditCheckBase {
     if ($this->isDrupal7()) {
       uasort($this->registry->requirements, 'drupal_sort_severity');
     } else {
-      uasort($this->registry->requirements, ['Drupal\Core\Extension\ModuleHandler', 'sortByWeightAndTitle']);
+      uasort($this->registry->requirements, [$this, 'sortRequirements']);
     }
 
     return $this->calculateFinalScore();
@@ -242,6 +242,20 @@ class StatusSystem extends SiteAuditCheckBase {
 
   protected function isDrupal7() {
     return version_compare(VERSION, '8.0', '<');
+  }
+
+  protected function sortRequirements($a, $b) {
+    if (!isset($a['weight'])) {
+      $a['weight'] = 0;
+    }
+    if (!isset($b['weight'])) {
+      $b['weight'] = 0;
+    }
+
+    if ($a['weight'] == $b['weight']) {
+      return strcasecmp($a['title'], $b['title']);
+    }
+    return ($a['weight'] < $b['weight']) ? -1 : 1;
   }
 
 }
