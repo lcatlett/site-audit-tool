@@ -14,6 +14,8 @@ use Symfony\Component\Console\Input\InputInterface;
 
 /**
  * Edit this file to reflect your organization's needs.
+ * This class provides Drush commands for Site Audit Tool.
+ * It now supports JSON, HTML, and Markdown output formats.
  */
 class SiteAuditCommands extends DrushCommands
 {
@@ -63,15 +65,14 @@ class SiteAuditCommands extends DrushCommands
         $param = '',
         $options = [
             'format' => 'json',
-
-            // Ignore these legacy flags for now
             'html' => false,
             'json' => false,
+            'markdown' => false,
             'detail' => false,
             'vendor' => '',
             'skip' => [],
-        ])
-    {
+        ]
+    ) {
         $this->init();
 
         $settings_excludes = \Drupal::config('site_audit')->get('opt_out');
@@ -80,15 +81,14 @@ class SiteAuditCommands extends DrushCommands
         // The skip parameter is almost always an array, even when the single
         // value is a list of options.
         if (is_array($options['skip']) && count($options['skip']) == 1) {
-          $skipped = explode(',', $options['skip'][0]);
-        }
-        elseif (is_string($options['skip'])) {
-          $skipped = explode(',', $options['skip']);
+            $skipped = explode(',', $options['skip'][0]);
+        } elseif (is_string($options['skip'])) {
+            $skipped = explode(',', $options['skip']);
         }
 
         if (!empty($settings_excludes)) {
-          $settings_excludes = array_keys($settings_excludes);
-          $skipped = array_merge($settings_excludes, $skipped);
+            $settings_excludes = array_keys($settings_excludes);
+            $skipped = array_merge($settings_excludes, $skipped);
         }
 
         $checks = $this->interimInstantiateChecks($this->createRegistry($options), $skipped);
@@ -101,6 +101,12 @@ class SiteAuditCommands extends DrushCommands
         // parse correctly with the extra whitespace.
         if ($options['json']) {
             print json_encode($result);
+            return null;
+        }
+
+        if ($options['markdown']) {
+            $markdown = $this->generateMarkdownReport($result);
+            print $markdown;
             return null;
         }
 
@@ -130,8 +136,8 @@ class SiteAuditCommands extends DrushCommands
             'html' => false,
             'detail' => false,
             'vendor' => '',
-        ])
-    {
+        ]
+    ) {
         return $this->singleReport('best_practices', $options);
     }
 
@@ -157,8 +163,8 @@ class SiteAuditCommands extends DrushCommands
             'html' => false,
             'detail' => false,
             'vendor' => '',
-        ])
-    {
+        ]
+    ) {
         return $this->singleReport('extensions', $options);
     }
 
@@ -184,8 +190,8 @@ class SiteAuditCommands extends DrushCommands
             'html' => false,
             'detail' => false,
             'vendor' => '',
-        ])
-    {
+        ]
+    ) {
         return $this->singleReport('block', $options);
     }
 
@@ -211,8 +217,8 @@ class SiteAuditCommands extends DrushCommands
             'html' => false,
             'detail' => false,
             'vendor' => '',
-        ])
-    {
+        ]
+    ) {
         return $this->singleReport('cache', $options);
     }
 
@@ -238,8 +244,8 @@ class SiteAuditCommands extends DrushCommands
             'html' => false,
             'detail' => false,
             'vendor' => '',
-        ])
-    {
+        ]
+    ) {
         return $this->singleReport('cron', $options);
     }
 
@@ -265,8 +271,8 @@ class SiteAuditCommands extends DrushCommands
             'html' => false,
             'detail' => false,
             'vendor' => '',
-        ])
-    {
+        ]
+    ) {
         return $this->singleReport('database', $options);
     }
 
@@ -292,8 +298,8 @@ class SiteAuditCommands extends DrushCommands
             'html' => false,
             'detail' => false,
             'vendor' => '',
-        ])
-    {
+        ]
+    ) {
         return $this->singleReport('security', $options);
     }
 
@@ -319,8 +325,8 @@ class SiteAuditCommands extends DrushCommands
             'html' => false,
             'detail' => false,
             'vendor' => '',
-        ])
-    {
+        ]
+    ) {
         return $this->singleReport('users', $options);
     }
 
@@ -346,8 +352,8 @@ class SiteAuditCommands extends DrushCommands
             'html' => false,
             'detail' => false,
             'vendor' => '',
-        ])
-    {
+        ]
+    ) {
         return $this->singleReport('views', $options);
     }
 
@@ -373,8 +379,8 @@ class SiteAuditCommands extends DrushCommands
             'html' => false,
             'detail' => false,
             'vendor' => '',
-        ])
-    {
+        ]
+    ) {
         return $this->singleReport('watchdog', $options);
     }
 
@@ -641,7 +647,7 @@ class SiteAuditCommands extends DrushCommands
             $checkResults += $this->interimReportResults($check);
         }
 
-        if($max == 0) {
+        if ($max == 0) {
             $percent = 0;
         } else {
             $percent = ($score * 100) / $max;
@@ -686,5 +692,47 @@ class SiteAuditCommands extends DrushCommands
         return str_replace('\\', '', $full_class_name);
     }
 
-}
+    protected function generateMarkdownReport($result)
+    {
+        $markdown = "# Site Audit Report\n\n";
+        $markdown .= "Generated on: " . date('Y-m-d H:i:s', $result['time']) . "\n\n";
 
+        foreach ($result['reports'] as $reportKey => $report) {
+            $markdown .= "## " . $report['label'] . "\n\n";
+            $markdown .= "Overall Score: " . $report['percent'] . "%\n\n";
+
+            foreach ($report['checks'] as $checkKey => $check) {
+                $markdown .= "### " . $check['label'] . "\n\n";
+                $markdown .= "**Result:** " . $check['result'] . "\n\n";
+                
+                if (!empty($check['action'])) {
+                    $markdown .= "**Action:** " . $check['action'] . "\n\n";
+                }
+
+                if (!empty($check['description'])) {
+                    $markdown .= "**Description:** " . $check['description'] . "\n\n";
+                }
+
+                $markdown .= "**Score:** " . $this->getScoreEmoji($check['score']) . "\n\n";
+            }
+        }
+
+        return $markdown;
+    }
+
+    protected function getScoreEmoji($score)
+    {
+        switch ($score) {
+            case SiteAuditCheckBase::AUDIT_CHECK_SCORE_PASS:
+                return "✅ Pass";
+            case SiteAuditCheckBase::AUDIT_CHECK_SCORE_WARN:
+                return "⚠️ Warning";
+            case SiteAuditCheckBase::AUDIT_CHECK_SCORE_FAIL:
+                return "❌ Fail";
+            case SiteAuditCheckBase::AUDIT_CHECK_SCORE_INFO:
+                return "ℹ️ Info";
+            default:
+                return "Unknown";
+        }
+    }
+}
