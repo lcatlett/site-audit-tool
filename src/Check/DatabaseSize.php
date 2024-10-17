@@ -14,7 +14,6 @@ use SiteAudit\SiteAuditCheckBase;
  */
 class DatabaseSize extends SiteAuditCheckBase
 {
-
   /**
    * Total database size.
    *
@@ -115,9 +114,8 @@ class DatabaseSize extends SiteAuditCheckBase
   public function calculateScore()
   {
     try {
-      $connection = $this->getDatabaseConnection();
-      $this->totalSize = $this->getDatabaseSize($connection);
-      $this->cacheSize = $this->getCacheTablesSize($connection);
+      $this->totalSize = $this->getDatabaseSize();
+      $this->cacheSize = $this->getCacheTablesSize();
 
       if (!$this->totalSize) {
         $this->abort = TRUE;
@@ -135,38 +133,21 @@ class DatabaseSize extends SiteAuditCheckBase
   }
 
   /**
-   * Get the database connection.
-   *
-   * @return \DatabaseConnection
-   *   The database connection.
-   */
-  protected function getDatabaseConnection()
-  {
-    if ($this->isDrupal7()) {
-      return Database::getConnection();
-    } else {
-      return \Drupal::database();
-    }
-  }
-
-  /**
    * Get the total database size.
-   *
-   * @param \DatabaseConnection $connection
-   *   The database connection.
    *
    * @return float
    *   The total size of the database in bytes.
    */
-  protected function getDatabaseSize($connection)
+  protected function getDatabaseSize()
   {
     if ($this->isDrupal7()) {
-      $database_name = $connection->getConnectionOptions()['database'];
-      $query = $connection->query("SELECT SUM(data_length + index_length) FROM information_schema.TABLES WHERE table_schema = :database", [
+      $database_name = $this->getDatabaseName();
+      $query = db_query("SELECT SUM(data_length + index_length) FROM information_schema.TABLES WHERE table_schema = :database", [
         ':database' => $database_name,
       ]);
       return (float) $query->fetchField();
     } else {
+      $connection = \Drupal::database();
       $query = $connection->select('information_schema.TABLES', 'ist');
       $query->addExpression('SUM(ist.data_length + ist.index_length)');
       $query->condition('ist.table_schema', $connection->getConnectionOptions()['database']);
@@ -177,26 +158,39 @@ class DatabaseSize extends SiteAuditCheckBase
   /**
    * Get the total size of cache tables.
    *
-   * @param \DatabaseConnection $connection
-   *   The database connection.
-   *
    * @return float
    *   The total size of cache tables in bytes.
    */
-  protected function getCacheTablesSize($connection)
+  protected function getCacheTablesSize()
   {
     if ($this->isDrupal7()) {
-      $database_name = $connection->getConnectionOptions()['database'];
-      $query = $connection->query("SELECT SUM(data_length + index_length) FROM information_schema.TABLES WHERE table_schema = :database AND table_name LIKE 'cache%'", [
+      $database_name = $this->getDatabaseName();
+      $query = db_query("SELECT SUM(data_length + index_length) FROM information_schema.TABLES WHERE table_schema = :database AND table_name LIKE 'cache%'", [
         ':database' => $database_name,
       ]);
       return (float) $query->fetchField();
     } else {
+      $connection = \Drupal::database();
       $query = $connection->select('information_schema.TABLES', 'ist');
       $query->addExpression('SUM(ist.data_length + ist.index_length)');
       $query->condition('ist.table_schema', $connection->getConnectionOptions()['database']);
       $query->condition('ist.table_name', 'cache%', 'LIKE');
       return (float) $query->execute()->fetchField();
+    }
+  }
+
+  /**
+   * Get the current database name.
+   *
+   * @return string
+   *   The name of the current database.
+   */
+  protected function getDatabaseName()
+  {
+    if ($this->isDrupal7()) {
+      return db_query('SELECT DATABASE()')->fetchField();
+    } else {
+      return \Drupal::database()->getConnectionOptions()['database'];
     }
   }
 
