@@ -96,10 +96,19 @@ class ExtensionsUnrecommended extends SiteAuditCheckBase {
     if ($this->isDrupal7()) {
       $result = db_query("SELECT name, status FROM {system} WHERE type = :type", array(':type' => 'module'));
     } else {
-      $result = \Drupal::database()->query
+      $result = \Drupal::database()->query("SELECT name, status FROM {system} WHERE type = :type", array(':type' => 'module'));
     }
 
-    foreach ($result as $row
+    foreach ($result as $row) {
+      if (isset($unrecommended[$row->name])) {
+        $this->registry->extensions_unrec[$row->name] = $unrecommended[$row->name];
+      }
+    }
+
+    if (!empty($this->registry->extensions_unrec)) {
+      return SiteAuditCheckBase::AUDIT_CHECK_SCORE_FAIL;
+    }
+    return SiteAuditCheckBase::AUDIT_CHECK_SCORE_PASS;
   }
 
   /**
