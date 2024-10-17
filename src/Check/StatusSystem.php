@@ -127,7 +127,8 @@ class StatusSystem extends SiteAuditCheckBase
       $ret_val = "| Title | Severity | Value |\n";
       $ret_val .= "|-------|----------|-------|\n";
       foreach ($items as $item) {
-        $ret_val .= "| " . $item['title'] . " | " . $item['severity'] . " | " . $item['value'] . " |\n";
+        $value = str_replace("\n", "<br>", $item['value']); // Replace newlines with <br> for Markdown
+        $ret_val .= "| " . $item['title'] . " | " . $item['severity'] . " | " . $value . " |\n";
       }
     }
     return $ret_val;
