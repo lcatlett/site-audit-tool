@@ -51,6 +51,12 @@ class CronLast extends SiteAuditCheckBase {
    */
   public function getResultInfo() {
     if ($this->registry->cron_last) {
+      if ($this->isDrupal7()) {
+        return $this->t('Cron last ran at @date (@ago ago)', array(
+          '@date' => date('r', $this->registry->cron_last),
+          '@ago' => format_interval(time() - $this->registry->cron_last),
+        ));
+      }
       return $this->t('Cron last ran at @date (@ago ago)', array(
         '@date' => date('r', $this->registry->cron_last),
         '@ago' => \Drupal::service('date.formatter')->formatInterval(time() - $this->registry->cron_last),

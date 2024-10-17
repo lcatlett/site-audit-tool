@@ -166,38 +166,59 @@ class StatusSystem extends SiteAuditCheckBase {
    * {@inheritdoc}.
    */
   public function calculateScore() {
-    // See system/system.admin.inc function system_status().
-    // Load .install files.
+    if ($this->isDrupal7()) {
+      return $this->calculateScoreDrupal7();
+    } else {
+      return $this->calculateScoreDrupal8Plus();
+    }
+  }
+
+  /**
+   * Calculate score for Drupal 7.
+   */
+  private function calculateScoreDrupal7() {
+    // Load .install files
+    include_once DRUPAL_ROOT . '/includes/install.inc';
+    drupal_load_updates();
+
+    // Check run-time requirements and status information.
+    $this->registry->requirements = module_invoke_all('requirements', 'runtime');
+    drupal_alter('requirements', $this->registry->requirements);
+    uasort($this->registry->requirements, 'drupal_sort_severity');
+
+    return $this->calculateFinalScore();
+  }
+
+  /**
+   * Calculate score for Drupal 8+.
+   */
+  private function calculateScoreDrupal8Plus() {
+    // Load .install files
     include_once DRUPAL_ROOT . '/core/includes/install.inc';
     drupal_load_updates();
 
     // Check run-time requirements and status information.
-    $this->registry->requirements = \Drupal::moduleHandler()->invokeAll('requirements', array('runtime'));
-    usort($this->registry->requirements, function($a, $b) {
-      if (!isset($a['weight'])) {
-        if (!isset($b['weight'])) {
-          return strcmp($a['title'], $b['title']);
-        }
-        return -$b['weight'];
-      }
-      return isset($b['weight']) ? $a['weight'] - $b['weight'] : $a['weight'];
-    });
+    $this->registry->requirements = \Drupal::moduleHandler()->invokeAll('requirements', ['runtime']);
+    \Drupal::moduleHandler()->alter('requirements', $this->registry->requirements);
+    uasort($this->registry->requirements, ['Drupal\Core\Extension\ModuleHandler', 'sortByWeightAndTitle']);
 
+    return $this->calculateFinalScore();
+  }
+
+  /**
+   * Calculate the final score based on requirements.
+   */
+  private function calculateFinalScore() {
     $this->percentOverride = 0;
-    $requirements_with_severity = array();
-    foreach ($this->registry->requirements as $key => $value) {
-      if (isset($value['severity'])) {
-        $requirements_with_severity[$key] = $value;
-      }
-    }
+    $requirements_with_severity = array_filter($this->registry->requirements, function($value) {
+      return isset($value['severity']);
+    });
     $score_each = 100 / count($requirements_with_severity);
 
     $worst_severity = REQUIREMENT_INFO;
     foreach ($this->registry->requirements as $requirement) {
       if (isset($requirement['severity'])) {
-        if ($requirement['severity'] > $worst_severity) {
-          $worst_severity = $requirement['severity'];
-        }
+        $worst_severity = max($worst_severity, $requirement['severity']);
         if ($requirement['severity'] == REQUIREMENT_WARNING) {
           $this->percentOverride += $score_each / 2;
         }
@@ -207,15 +228,8 @@ class StatusSystem extends SiteAuditCheckBase {
       }
     }
 
-    $this->percentOverride = round($this->percentOverride);
-
-    if ($this->percentOverride > 80) {
-      return SiteAuditCheckBase::AUDIT_CHECK_SCORE_PASS;
-    }
-    elseif ($this->percentOverride > 60) {
-      return SiteAuditCheckBase::AUDIT_CHECK_SCORE_WARN;
-    }
-    return SiteAuditCheckBase::AUDIT_CHECK_SCORE_FAIL;
+    $this->percentOverride = min($this->percentOverride, 100);
+    return $this->percentOverride;
   }
 
 }

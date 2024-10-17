@@ -77,12 +77,22 @@ class UsersRolesList extends SiteAuditCheckBase {
    * {@inheritdoc}.
    */
   public function calculateScore() {
-    $query = Database::getConnection()->select('user__roles');
-    $query->addExpression('COUNT(entity_id)', 'count');
-    $query->addfield('user__roles', 'roles_target_id', 'name');
-    $query->groupBy('name');
-    $query->orderBy('name', 'ASC');
-    $results = $query->execute();
+    if ($this->isDrupal7()) {
+      $query = db_select('role', 'r');
+      $query->addExpression('COUNT(u.uid)', 'count');
+      $query->leftJoin('users_roles', 'u', 'u.rid = r.rid');
+      $query->fields('r', array('name'));
+      $query->groupBy('r.rid');
+      $query->orderBy('r.name', 'ASC');
+      $results = $query->execute();
+    } else {
+      $query = Database::getConnection()->select('user__roles');
+      $query->addExpression('COUNT(entity_id)', 'count');
+      $query->addfield('user__roles', 'roles_target_id', 'name');
+      $query->groupBy('name');
+      $query->orderBy('name', 'ASC');
+      $results = $query->execute();
+    }
     while ($row = $results->fetchObject()) {
       $this->registry->roles[$row->name] = $row->count;
     }

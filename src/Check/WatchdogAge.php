@@ -92,15 +92,21 @@ class WatchdogAge extends SiteAuditCheckBase {
       return;
     }
 
-    // Age of oldest entry.
-    $query = Database::getConnection()->select('watchdog');
+    if ($this->isDrupal7()) {
+      $query = db_select('watchdog');
+    } else {
+      $query = Database::getConnection()->select('watchdog');
+    }
     $query->addField('watchdog', 'timestamp');
     $query->orderBy('wid', 'ASC');
     $query->range(0, 1);
     $this->ageOldest = $query->execute()->fetchField();
 
-    // Age of newest entry.
-    $query = Database::getConnection()->select('watchdog');
+    if ($this->isDrupal7()) {
+      $query = db_select('watchdog');
+    } else {
+      $query = Database::getConnection()->select('watchdog');
+    }
     $query->addField('watchdog', 'timestamp');
     $query->orderBy('wid', 'DESC');
     $query->range(0, 1);

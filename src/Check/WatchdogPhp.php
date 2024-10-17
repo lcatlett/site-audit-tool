@@ -97,14 +97,18 @@ class WatchdogPhp extends SiteAuditCheckBase {
       return;
     }
 
-    $query = Database::getConnection()->select('watchdog');
+    if ($this->isDrupal7()) {
+      $query = db_select('watchdog');
+    } else {
+      $query = Database::getConnection()->select('watchdog');
+    }
     $query->addExpression('COUNT(*)', 'count');
     $query->addField('watchdog', 'severity');
     $query->groupBy('severity');
     $query->orderBy('severity', 'ASC');
     $result = $query->execute();
 
-    $severity_levels = $this->watchdog_severity_levels();
+    $severity_levels = $this->isDrupal7() ? watchdog_severity_levels() : $this->watchdog_severity_levels();
     while ($row = $result->fetchObject()) {
       $row->severity = $severity_levels[$row->severity];
       //$row = watchdog_format_result($result);

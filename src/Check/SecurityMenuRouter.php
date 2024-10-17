@@ -257,26 +257,36 @@ class SecurityMenuRouter extends SiteAuditCheckBase {
       'php_strip_whitespace' => 'reads files',
       'get_meta_tags' => 'reads files',
     );
-    $all_routes = \Drupal::service('router.route_provider')->getAllRoutes();
-    $callback_keys = array(
-      '_controller',
-      '_title_callback',
-    );
-    foreach ($all_routes as $route) {
-      $defaults = $route->getDefaults();
-      foreach ($callback_keys as $key) {
-        if (isset($defaults[$key]) && in_array($defaults[$key], array_keys($dangerous_callbacks))) {
-          $callback = $defaults[$key];
-          $parameters = (new \ReflectionFunction($callback))->getParameters();
-          $parameters = array_map(function($parameter) {
-            return $parameter->name;
-          }, $parameters);
-          $passed_arguments = array_intersect($parameters, array_keys($defaults));
-          $arguments = array();
-          foreach ($passed_arguments as $argument) {
-            $arguments[] = $argument . '=' . $defaults[$argument];
+
+    if ($this->isDrupal7()) {
+      $result = db_query("SELECT path, page_callback FROM {menu_router}");
+      foreach ($result as $record) {
+        if (in_array($record->page_callback, array_keys($dangerous_callbacks))) {
+          $this->registry->menu_router[$record->path][] = 'page_callback "' . $record->page_callback . '" (' . $dangerous_callbacks[$record->page_callback] . ')';
+        }
+      }
+    } else {
+      $all_routes = \Drupal::service('router.route_provider')->getAllRoutes();
+      $callback_keys = array(
+        '_controller',
+        '_title_callback',
+      );
+      foreach ($all_routes as $route) {
+        $defaults = $route->getDefaults();
+        foreach ($callback_keys as $key) {
+          if (isset($defaults[$key]) && in_array($defaults[$key], array_keys($dangerous_callbacks))) {
+            $callback = $defaults[$key];
+            $parameters = (new \ReflectionFunction($callback))->getParameters();
+            $parameters = array_map(function($parameter) {
+              return $parameter->name;
+            }, $parameters);
+            $passed_arguments = array_intersect($parameters, array_keys($defaults));
+            $arguments = array();
+            foreach ($passed_arguments as $argument) {
+              $arguments[] = $argument . '=' . $defaults[$argument];
+            }
+            $this->registry->menu_router[$route->getPath()][] = $key . ' "' . $callback . '" (' . $dangerous_callbacks[$callback] . ') with the following arguments: "' . implode(',', $arguments) . '"';
           }
-          $this->registry->menu_router[$route->getPath()][] = $key . ' "' . $callback . '" (' . $dangerous_callbacks[$callback] . ') with the following arguments: "' . implode(',', $arguments) . '"';
         }
       }
     }

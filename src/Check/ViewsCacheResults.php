@@ -103,9 +103,16 @@ class ViewsCacheResults extends SiteAuditCheckBase {
     if (empty($this->registry->views)) {
       $this->checkInvokeCalculateScore('views_count');
     }
-    foreach ($this->registry->views as $view) {
-      // Skip views used for administration purposes.
-      if (in_array($view->get('tag'), array('admin', 'commerce'))) {
+    if ($this->isDrupal7()) {
+      $views = views_get_all_views();
+    } else {
+      $views = \Drupal::entityTypeManager()->getStorage('view')->loadMultiple();
+    }
+
+    foreach ($views as $view) {
+      // Adjust the following line based on how view properties are accessed in Drupal 7 vs 8+
+      $tag = $this->isDrupal7() ? $view->tag : $view->get('tag');
+      if (in_array($tag, array('admin', 'commerce'))) {
         continue;
       }
       foreach ($view->get('display') as $display_name => $display) {

@@ -74,12 +74,16 @@ class WatchdogEnabled extends SiteAuditCheckBase {
    * {@inheritdoc}.
    */
   public function calculateScore() {
-    if (!\Drupal::moduleHandler()->moduleExists('dblog')) {
-      $this->registry->watchdog_enabled = FALSE;
+    if ($this->isDrupal7()) {
+      $this->registry->watchdog_enabled = module_exists('dblog');
+    } else {
+      $this->registry->watchdog_enabled = \Drupal::moduleHandler()->moduleExists('dblog');
+    }
+
+    if (!$this->registry->watchdog_enabled) {
       $this->abort = TRUE;
       return SiteAuditCheckBase::AUDIT_CHECK_SCORE_INFO;
     }
-    $this->registry->watchdog_enabled = TRUE;
     return SiteAuditCheckBase::AUDIT_CHECK_SCORE_PASS;
   }
 

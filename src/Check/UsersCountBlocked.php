@@ -80,12 +80,19 @@ class UsersCountBlocked extends SiteAuditCheckBase {
    * {@inheritdoc}.
    */
   public function calculateScore() {
-    $query = Database::getConnection()->select('users_field_data', 'ufd');
-    $query->addExpression('COUNT(*)', 'count');
-    $query->condition('uid', 0, '>');
-    $query->condition('status', 0);
-
-    $this->registry->count_users_blocked = $query->execute()->fetchField();
+    if ($this->isDrupal7()) {
+      $query = db_select('users', 'u')
+        ->condition('uid', 0, '>')
+        ->condition('status', 0);
+      $query->addExpression('COUNT(*)', 'count');
+      $this->registry->count_users_blocked = $query->execute()->fetchField();
+    } else {
+      $query = Database::getConnection()->select('users_field_data', 'ufd');
+      $query->addExpression('COUNT(*)', 'count');
+      $query->condition('uid', 0, '>');
+      $query->condition('status', 0);
+      $this->registry->count_users_blocked = $query->execute()->fetchField();
+    }
     return SiteAuditCheckBase::AUDIT_CHECK_SCORE_INFO;
   }
 

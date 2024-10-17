@@ -78,16 +78,15 @@ class WatchdogCount extends SiteAuditCheckBase {
    * {@inheritdoc}.
    */
   public function calculateScore() {
-    if (!isset($this->registry->watchdog_enabled)) {
-      $this->checkInvokeCalculateScore('watchdog_enabled');
+    if ($this->isDrupal7()) {
+      $query = db_select('watchdog');
+    } else {
+      $query = Database::getConnection()->select('watchdog');
     }
-    if (!$this->registry->watchdog_enabled) {
-      return;
-    }
-    $query = Database::getConnection()->select('watchdog');
     $query->addExpression('COUNT(wid)', 'count');
 
     $this->registry->count_entries = $query->execute()->fetchField();
+
     if (!$this->registry->count_entries) {
       $this->abort = TRUE;
     }

@@ -72,22 +72,28 @@ class CacheBinsUsed extends SiteAuditCheckBase {
    * {@inheritdoc}.
    */
   public function calculateScore() {
-    $container = \Drupal::getContainer();
-    if (empty($this->registry->cache_bins_all)) {
-      $container = \Drupal::getContainer();
-      $services = $container->getServiceIds();
-
-      $this->registry->cache_bins_all = [];
-      $back_ends = preg_grep('/^cache\.backend\./', array_values($services));
-      foreach ($back_ends as $backend) {
-        $this->registry->cache_bins_all[$backend] = get_class($container->get($backend));
+    if ($this->isDrupal7()) {
+      $this->registry->cache_bins_used = array();
+      foreach (cache_get_bins() as $bin => $cache) {
+        $this->registry->cache_bins_used[$bin] = get_class($cache);
       }
-    }
+    } else {
+      $container = \Drupal::getContainer();
+      if (empty($this->registry->cache_bins_all)) {
+        $services = $container->getServiceIds();
 
-    foreach ($container->getParameter('cache_bins') as $service => $bin) {
-      $backend_class = get_class($container->get($service)) . 'Factory';
-      $backend = array_search($backend_class, $this->registry->cache_bins_all);
-      $this->registry->cache_bins_used[$bin] = $backend;
+        $this->registry->cache_bins_all = array();
+        $back_ends = preg_grep('/^cache\.backend\./', array_values($services));
+        foreach ($back_ends as $backend) {
+          $this->registry->cache_bins_all[$backend] = get_class($container->get($backend));
+        }
+      }
+
+      foreach ($container->getParameter('cache_bins') as $service => $bin) {
+        $backend_class = get_class($container->get($service)) . 'Factory';
+        $backend = array_search($backend_class, $this->registry->cache_bins_all);
+        $this->registry->cache_bins_used[$bin] = $backend;
+      }
     }
 
     return SiteAuditCheckBase::AUDIT_CHECK_SCORE_INFO;

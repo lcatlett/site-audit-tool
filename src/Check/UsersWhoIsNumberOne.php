@@ -53,10 +53,17 @@ class UsersWhoIsNumberOne extends SiteAuditCheckBase {
    * {@inheritdoc}.
    */
   public function getResultInfo() {
-    return $this->t('UID #1: @name, email: @mail', array(
-      '@name' => $this->registry->uid_1->get('name')->value,
-      '@mail' => $this->registry->uid_1->get('mail')->value,
-    ));
+    if ($this->isDrupal7()) {
+      return $this->t('UID #1: @name, email: @mail', array(
+        '@name' => $this->registry->uid_1->name,
+        '@mail' => $this->registry->uid_1->mail,
+      ));
+    } else {
+      return $this->t('UID #1: @name, email: @mail', array(
+        '@name' => $this->registry->uid_1->get('name')->value,
+        '@mail' => $this->registry->uid_1->get('mail')->value,
+      ));
+    }
   }
 
   /**
@@ -78,7 +85,11 @@ class UsersWhoIsNumberOne extends SiteAuditCheckBase {
    * {@inheritdoc}.
    */
   public function calculateScore() {
-    $uid_1 = User::load(1);
+    if ($this->isDrupal7()) {
+      $uid_1 = user_load(1);
+    } else {
+      $uid_1 = User::load(1);
+    }
     if (!$uid_1) {
       $this->abort = TRUE;
       return SiteAuditCheckBase::AUDIT_CHECK_SCORE_FAIL;

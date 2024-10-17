@@ -72,15 +72,22 @@ class CacheBinsDefault extends SiteAuditCheckBase {
    * {@inheritdoc}.
    */
   public function calculateScore() {
-    $container = \Drupal::getContainer();
-    $defaults = $container->getParameter('cache_default_bin_backends');
-    $this->registry->cache_default_backends = [];
-    foreach ($container->getParameter('cache_bins') as $bin) {
-      if (isset($defaults[$bin])) {
-        $this->registry->cache_default_backends[$bin] = $defaults[$bin];
+    if ($this->isDrupal7()) {
+      $this->registry->cache_default_backends = array();
+      foreach (cache_get_bins() as $bin => $cache) {
+        $this->registry->cache_default_backends[$bin] = get_class($cache);
       }
-      else {
-        $this->registry->cache_default_backends[$bin] = 'cache.backend.database';
+    } else {
+      $container = \Drupal::getContainer();
+      $defaults = $container->getParameter('cache_default_bin_backends');
+      $this->registry->cache_default_backends = array();
+      foreach ($container->getParameter('cache_bins') as $bin) {
+        if (isset($defaults[$bin])) {
+          $this->registry->cache_default_backends[$bin] = $defaults[$bin];
+        }
+        else {
+          $this->registry->cache_default_backends[$bin] = 'cache.backend.database';
+        }
       }
     }
     return SiteAuditCheckBase::AUDIT_CHECK_SCORE_INFO;

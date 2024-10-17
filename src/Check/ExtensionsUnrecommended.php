@@ -91,35 +91,15 @@ class ExtensionsUnrecommended extends SiteAuditCheckBase {
    */
   public function calculateScore() {
     $this->registry->extensions_unrec = array();
-    if (!isset($this->registry->extensions)) {
-      $this->checkInvokeCalculateScore('extensions_count');
-    }
-    $extension_info = $this->registry->extensions;
-    #uasort($extension_info, '_drush_pm_sort_extensions');
-    $unrecommended_extensions = $this->getExtensions();
+    $unrecommended = $this->getExtensions();
 
-    foreach ($extension_info as $extension) {
-      $row = array();
-
-      $machine_name = $extension->getName();
-
-      // Not in the list of known unrecommended modules.
-      if (!array_key_exists($machine_name, $unrecommended_extensions)) {
-        continue;
-      }
-
-      // Name.
-      $row[] = $extension->label;
-      // Reason.
-      $row[] = $unrecommended_extensions[$machine_name];
-
-      $this->registry->extensions_unrec[$machine_name] = $row;
+    if ($this->isDrupal7()) {
+      $result = db_query("SELECT name, status FROM {system} WHERE type = :type", array(':type' => 'module'));
+    } else {
+      $result = \Drupal::database()->query
     }
 
-    if (!empty($this->registry->extensions_unrec)) {
-      return SiteAuditCheckBase::AUDIT_CHECK_SCORE_FAIL;
-    }
-    return SiteAuditCheckBase::AUDIT_CHECK_SCORE_PASS;
+    foreach ($result as $row
   }
 
   /**

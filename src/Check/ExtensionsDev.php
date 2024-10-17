@@ -100,39 +100,30 @@ class ExtensionsDev extends SiteAuditCheckBase {
    * {@inheritdoc}.
    */
   public function calculateScore() {
-    $dev_modules = array(
-        'devel',
-        'devel_generate',
-        'devel_node_access',
-        'update',
-        'dblog',
-        'field_ui',
-        'views_ui',
-    );
-
+    $dev_modules = $this->getExtensions();
     $enabled_dev_modules = [];
 
     if ($this->isDrupal7()) {
-        $modules = module_list();
-        foreach ($dev_modules as $dev_module) {
-            if (isset($modules[$dev_module])) {
-                $enabled_dev_modules[] = $dev_module;
-            }
+      $modules = module_list();
+      foreach ($dev_modules as $dev_module => $reason) {
+        if (isset($modules[$dev_module])) {
+          $enabled_dev_modules[$dev_module] = $reason;
         }
+      }
     } else {
-        $modules = \Drupal::moduleHandler()->getModuleList();
-        foreach ($dev_modules as $dev_module) {
-            if (isset($modules[$dev_module])) {
-                $enabled_dev_modules[] = $dev_module;
-            }
+      $modules = \Drupal::moduleHandler()->getModuleList();
+      foreach ($dev_modules as $dev_module => $reason) {
+        if (isset($modules[$dev_module])) {
+          $enabled_dev_modules[$dev_module] = $reason;
         }
+      }
     }
 
     if (!empty($enabled_dev_modules)) {
-        if (SiteAuditEnvironment::isDev()) {
-            return SiteAuditCheckBase::AUDIT_CHECK_SCORE_INFO;
-        }
-        return SiteAuditCheckBase::AUDIT_CHECK_SCORE_WARN;
+      if (SiteAuditEnvironment::isDev()) {
+        return SiteAuditCheckBase::AUDIT_CHECK_SCORE_INFO;
+      }
+      return SiteAuditCheckBase::AUDIT_CHECK_SCORE_WARN;
     }
     return SiteAuditCheckBase::AUDIT_CHECK_SCORE_PASS;
   }

@@ -96,24 +96,26 @@ class UsersBlockedNumberOne extends SiteAuditCheckBase {
    * {@inheritdoc}.
    */
   public function calculateScore() {
+    if ($this->isDrupal7()) {
+      $status = db_query("SELECT status FROM {users} WHERE uid = 1")->fetchField();
+    } else {
+      $query = Database::getConnection()->select('users_field_data', 'ufd');
+      $query->addField('ufd', 'status');
+      $query->condition('uid', 1);
+      $status = $query->execute()->fetchField();
+    }
 
-    $query = Database::getConnection()->select('users_field_data', 'ufd');
-    $query->addField('ufd', 'status');
-    $query->condition('uid', 1);
-
-    if (!$query->execute()->fetchField()) {
+    if (!$status) {
       // UID 1 is blocked or otherwise disabled.
       $this->status = 0;
       return SiteAuditCheckBase::AUDIT_CHECK_SCORE_PASS;
-    }
-    else {
+    } else {
       // UID 1 is active.
       $this->status = 1;
       // If UID 1 is active, but the request is made from Pantheon, pass.
       if ($this->registry->vendor == "pantheon") {
         return SiteAuditCheckBase::AUDIT_CHECK_SCORE_PASS;
       }
-
       return SiteAuditCheckBase::AUDIT_CHECK_SCORE_FAIL;
     }
   }

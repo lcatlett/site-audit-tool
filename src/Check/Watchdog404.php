@@ -91,9 +91,15 @@ class Watchdog404 extends SiteAuditCheckBase {
       $this->registry->count_404 = 'n/a';
       return;
     }
-    $query = Database::getConnection()->select('watchdog');
-    $query->addExpression('COUNT(wid)', 'count');
-    $query->condition('type', 'page not found');
+    if ($this->isDrupal7()) {
+      $query = db_select('watchdog');
+      $query->addExpression('COUNT(wid)', 'count');
+      $query->condition('type', 'page not found');
+    } else {
+      $query = Database::getConnection()->select('watchdog');
+      $query->addExpression('COUNT(wid)', 'count');
+      $query->condition('type', 'page not found');
+    }
     $this->registry->count_404 = $query->execute()->fetchField();
 
     $this->registry->percent_404 = 0;

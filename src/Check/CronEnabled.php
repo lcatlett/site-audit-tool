@@ -84,11 +84,19 @@ class CronEnabled extends SiteAuditCheckBase {
    */
   public function getAction() {
     if ($this->score == SiteAuditCheckBase::AUDIT_CHECK_SCORE_FAIL) {
-      return $this->t('Please visit /admin/config/system/cron and set the cron frequency to something other than Never but less than 24 hours.');
+      if ($this->isDrupal7()) {
+        return $this->t('Please visit admin/config/system/cron and set the cron frequency to something other than Never but less than 24 hours.');
+      } else {
+        return $this->t('Please visit /admin/config/system/cron and set the cron frequency to something other than Never but less than 24 hours.');
+      }
     }
     elseif ($this->score == SiteAuditCheckBase::AUDIT_CHECK_SCORE_WARN) {
       if ($this->registry->cron_safe_threshold > (24 * 60 * 60)) {
-        return $this->t('Please visit /admin/config/system/cron and set the cron frequency to something less than 24 hours.');
+        if ($this->isDrupal7()) {
+          return $this->t('Please visit admin/config/system/cron and set the cron frequency to something less than 24 hours.');
+        } else {
+          return $this->t('Please visit /admin/config/system/cron and set the cron frequency to something less than 24 hours.');
+        }
       }
     }
   }
@@ -97,13 +105,14 @@ class CronEnabled extends SiteAuditCheckBase {
    * {@inheritdoc}.
    */
   public function calculateScore() {
-    // Determine when cron last ran.
-    $this->registry->cron_last = \Drupal::state()->get('system.cron_last');
-    // Usually we'd just fetch this with \Drupal::config('automated_cron.settings')->get('interval');
-    // However, Drush goes out of its way to hide the interval (make it appear to be '0') to avoid
-    // cron runs during Drush commands. We can still access the correct value via the raw data though.
-    $rawData = \Drupal::config('automated_cron.settings')->getRawData();
-    $this->registry->cron_safe_threshold = isset($rawData['interval']) ? $rawData['interval'] : 0;
+    if ($this->isDrupal7()) {
+      $this->registry->cron_last = variable_get('cron_last');
+      $this->registry->cron_safe_threshold = variable_get('cron_safe_threshold', DRUPAL_CRON_DEFAULT_THRESHOLD);
+    } else {
+      $this->registry->cron_last = \Drupal::state()->get('system.cron_last');
+      $rawData = \Drupal::config('automated_cron.settings')->getRawData();
+      $this->registry->cron_safe_threshold = isset($rawData['interval']) ? $rawData['interval'] : 0;
+    }
 
     // Cron hasn't run in the past day.
     if ((time() - $this->registry->cron_last) > (24 * 60 * 60)) {

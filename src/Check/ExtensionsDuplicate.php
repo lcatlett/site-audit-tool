@@ -158,7 +158,11 @@ class ExtensionsDuplicate extends SiteAuditCheckBase {
     $this->filterOutResult();
 
     // Review the detected extensions.
-    $moduleHandler = \Drupal::service('module_handler');
+    if ($this->isDrupal7()) {
+      $moduleHandler = module_list();
+    } else {
+      $moduleHandler = \Drupal::service('module_handler');
+    }
     foreach ($this->registry->extensions_dupe as $extension => $instances) {
       $paths_in_profile = 0;
       $non_profile_index = 0;

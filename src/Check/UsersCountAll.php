@@ -75,9 +75,15 @@ class UsersCountAll extends SiteAuditCheckBase {
    * {@inheritdoc}.
    */
   public function calculateScore() {
-    $query = Database::getConnection()->select('users');
-    $query->addExpression('COUNT(*)', 'count');
-    $query->condition('uid', 0, '<>');
+    if ($this->isDrupal7()) {
+      $query = db_select('users');
+      $query->addExpression('COUNT(*)', 'count');
+      $query->condition('uid', 0, '<>');
+    } else {
+      $query = Database::getConnection()->select('users');
+      $query->addExpression('COUNT(*)', 'count');
+      $query->condition('uid', 0, '<>');
+    }
 
     try {
       $this->registry->count_users_all = $query->execute()->fetchField();
@@ -87,7 +93,7 @@ class UsersCountAll extends SiteAuditCheckBase {
       }
       return SiteAuditCheckBase::AUDIT_CHECK_SCORE_INFO;
     }
-    catch (DatabaseExceptionWrapper $e) {
+    catch (Exception $e) {
       $this->abort = TRUE;
       return SiteAuditCheckBase::AUDIT_CHECK_SCORE_FAIL;
     }
