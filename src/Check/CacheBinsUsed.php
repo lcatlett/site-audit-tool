@@ -72,10 +72,13 @@ class CacheBinsUsed extends SiteAuditCheckBase {
    * {@inheritdoc}.
    */
   public function calculateScore() {
+    $this->registry->cache_bins_used = array();
+
     if ($this->isDrupal7()) {
-      $this->registry->cache_bins_used = array();
-      foreach (cache_get_bins() as $bin => $cache) {
-        $this->registry->cache_bins_used[$bin] = get_class($cache);
+      $query = db_query("SHOW TABLES LIKE 'cache%'");
+      foreach ($query as $row) {
+        $table_name = reset($row);
+        $this->registry->cache_bins_used[$table_name] = 'DrupalDatabaseCache';
       }
     } else {
       $container = \Drupal::getContainer();
