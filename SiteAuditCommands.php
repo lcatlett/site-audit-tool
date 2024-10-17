@@ -452,17 +452,19 @@ class SiteAuditCommands extends DrushCommands
 
         $registry = new \stdClass();
 
-        // We'd rather 'registry' be a class with an interface, but
-        // since we do not have that, we will simply add these options
-        // as attributes of the stdClass to serve as a replacement for
-        // drush_get_option().
         $registry->vendor = $options['vendor'];
         $registry->html = $options['html'];
         $registry->detail = $options['detail'];
 
         $registry->checksList = new ChecksRegistry();
 
-        $registry->container = \Drupal::hasContainer() ? \Drupal::getContainer() : null;
+        if ($this->isDrupal7()) {
+            // For Drupal 7, we don't have a container
+            $registry->container = null;
+        } else {
+            // For Drupal 8+, use the container if available
+            $registry->container = class_exists('\Drupal') && \Drupal::hasContainer() ? \Drupal::getContainer() : null;
+        }
 
         return $registry;
     }
