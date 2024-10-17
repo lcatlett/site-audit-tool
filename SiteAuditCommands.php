@@ -731,7 +731,7 @@ class SiteAuditCommands extends DrushCommands
         $markdown .= "|--------|-------|\n";
 
         // Extract information from the result string
-        $resultLines = explode('<br>', $result['database_size_info']['result']);
+        $resultLines = explode('<br>', $result['database_size_info']['result'] ?? '');
         foreach ($resultLines as $line) {
             $parts = explode(': ', $line, 2);
             if (count($parts) == 2) {
@@ -908,7 +908,7 @@ class SiteAuditCommands extends DrushCommands
                 foreach ($report['checks'] as $checkKey => $check) {
                     if (strpos($checkKey, 'DatabaseSize') !== false) {
                         $info = [];
-                        $resultLines = explode('<br>', $check['result']);
+                        $resultLines = explode('<br>', $check['result'] ?? '');
                         foreach ($resultLines as $line) {
                             $parts = explode(': ', $line, 2);
                             if (count($parts) == 2) {

@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @file
  * Contains Drupal\site_audit\Plugin\SiteAuditCheck\DatabaseSize
@@ -12,129 +13,160 @@ use Drupal\Core\Database\Database;
 /**
  * Provides the Database size check.
  */
-class DatabaseSize extends SiteAuditCheckBase {
+class DatabaseSize extends SiteAuditCheckBase
+{
+
+  /**
+   * Total database size.
+   *
+   * @var float
+   */
+  protected $totalSize;
+
+  /**
+   * Cache tables size.
+   *
+   * @var float
+   */
+  protected $cacheSize;
 
   /**
    * {@inheritdoc}.
    */
-  public function getId() {
+  public function getId()
+  {
     return 'database_size';
   }
 
   /**
    * {@inheritdoc}.
    */
-  public function getLabel() {
+  public function getLabel()
+  {
     return $this->t('Database size');
   }
 
   /**
    * {@inheritdoc}.
    */
-  public function getDescription() {
-    return $this->t("Determine the size of the database, including cache tables.");
+  public function getDescription()
+  {
+    return $this->t("Determine the size of the database and cache tables.");
   }
 
   /**
    * {@inheritdoc}.
    */
-  public function getReportId() {
+  public function getReportId()
+  {
     return 'database';
   }
 
   /**
    * {@inheritdoc}.
    */
-  public function getResultFail() {
-    return $this->t('Unable to determine the database size.');
+  public function getResultFail()
+  {
+    return $this->t('Empty, or unable to determine the size due to a permission error.');
   }
 
   /**
    * {@inheritdoc}.
    */
-  public function getResultInfo() {
-    return $this->t('Total database size: @total_size<br>Non-cache tables size: @non_cache_size<br>Cache tables size: @cache_size (@cache_percentage% of total)<br>Number of cache tables: @cache_count', [
-      '@total_size' => $this->formatSize($this->registry->total_size),
-      '@non_cache_size' => $this->formatSize($this->registry->non_cache_size),
-      '@cache_size' => $this->formatSize($this->registry->cache_size),
-      '@cache_percentage' => number_format($this->registry->cache_percentage, 2),
-      '@cache_count' => $this->registry->cache_count,
+  public function getResultInfo()
+  {
+    $totalSizeMB = number_format($this->totalSize / 1048576, 2);
+    $cacheSizeMB = number_format($this->cacheSize / 1048576, 2);
+    $cachePercentage = number_format(($this->cacheSize / $this->totalSize) * 100, 2);
+
+    return $this->t('Total database size: @total_size MB<br>Cache tables size: @cache_size MB (@cache_percentage% of total)', [
+      '@total_size' => $totalSizeMB,
+      '@cache_size' => $cacheSizeMB,
+      '@cache_percentage' => $cachePercentage,
     ]);
   }
 
   /**
    * {@inheritdoc}.
    */
-  public function getResultPass() {
-    return $this->getResultInfo();
+  public function getResultPass() {}
+
+  /**
+   * {@inheritdoc}.
+   */
+  public function getResultWarn()
+  {
+    return $this->t('Cache tables occupy more than 20% of the total database size. Consider clearing caches or optimizing cache configuration.');
   }
 
   /**
    * {@inheritdoc}.
    */
-  public function getResultWarn() {
-    return $this->t('Cache tables occupy @cache_percentage% of the total database size, which is higher than recommended.', [
-      '@cache_percentage' => number_format($this->registry->cache_percentage, 2),
-    ]) . '<br>' . $this->getResultInfo();
-  }
-
-  /**
-   * {@inheritdoc}.
-   */
-  public function getAction() {
-    if ($this->score == SiteAuditCheckBase::AUDIT_CHECK_SCORE_WARN) {
-      return $this->t('Consider clearing caches or optimizing cache configuration to reduce database size.');
+  public function getAction()
+  {
+    if (($this->cacheSize / $this->totalSize) > 0.2) {
+      return $this->t('Review your cache configuration and consider clearing caches if necessary.');
     }
-    return NULL;
+    return '';
   }
 
   /**
    * {@inheritdoc}.
    */
-  public function calculateScore() {
-    $connection = Database::getConnection();
+  public function calculateScore()
+  {
+    $connection = \Drupal\Core\Database\Database::getConnection();
     try {
-      // Get total database size
-      $query = $connection->select('information_schema.TABLES', 'ist');
-      $query->addExpression('SUM(ist.data_length + ist.index_length)');
-      $query->condition('ist.table_schema', $connection->getConnectionOptions()['database']);
-      $this->registry->total_size = $query->execute()->fetchField();
+      $this->totalSize = $this->getDatabaseSize($connection);
+      $this->cacheSize = $this->getCacheTablesSize($connection);
 
-      // Get cache tables size and count
-      $query = $connection->select('information_schema.TABLES', 'ist');
-      $query->addExpression('SUM(ist.data_length + ist.index_length)');
-      $query->addExpression('COUNT(ist.table_name)');
-      $query->condition('ist.table_schema', $connection->getConnectionOptions()['database']);
-      $query->condition('ist.table_name', 'cache%', 'LIKE');
-      $result = $query->execute()->fetchAssoc();
+      if (!$this->totalSize) {
+        $this->abort = TRUE;
+        return SiteAuditCheckBase::AUDIT_CHECK_SCORE_FAIL;
+      }
 
-      $this->registry->cache_size = $result['SUM(ist.data_length + ist.index_length)'];
-      $this->registry->cache_count = $result['COUNT(ist.table_name)'];
-      $this->registry->non_cache_size = $this->registry->total_size - $this->registry->cache_size;
-      $this->registry->cache_percentage = ($this->registry->cache_size / $this->registry->total_size) * 100;
-
-      if ($this->registry->cache_percentage > 20) {
+      if (($this->cacheSize / $this->totalSize) > 0.2) {
         return SiteAuditCheckBase::AUDIT_CHECK_SCORE_WARN;
       }
-      return SiteAuditCheckBase::AUDIT_CHECK_SCORE_PASS;
-    }
-    catch (\Exception $e) {
+
+      return SiteAuditCheckBase::AUDIT_CHECK_SCORE_INFO;
+    } catch (Exception $e) {
       return SiteAuditCheckBase::AUDIT_CHECK_SCORE_FAIL;
     }
   }
 
   /**
-   * Format a size in bytes to a more human-readable format.
+   * Get the total database size.
    *
-   * @param int $size
-   *   The size in bytes.
+   * @param \Drupal\Core\Database\Connection $connection
+   *   The database connection.
    *
-   * @return string
-   *   The formatted size.
+   * @return float
+   *   The total size of the database in bytes.
    */
-  private function formatSize($size) {
-    $units = ['B', 'KB', 'MB', 'GB', 'TB'];
-    $power = $size > 0 ? floor(log($size, 1024)) : 0;
-    return number_format($size / pow(1024, $power), 2, '.', ',') . ' ' . $units[$power];
+  protected function getDatabaseSize($connection)
+  {
+    $query = $connection->select('information_schema.TABLES', 'ist');
+    $query->addExpression('SUM(ist.data_length + ist.index_length)');
+    $query->condition('ist.table_schema', $connection->getConnectionOptions()['database']);
+    return (float) $query->execute()->fetchField();
+  }
+
+  /**
+   * Get the total size of cache tables.
+   *
+   * @param \Drupal\Core\Database\Connection $connection
+   *   The database connection.
+   *
+   * @return float
+   *   The total size of cache tables in bytes.
+   */
+  protected function getCacheTablesSize($connection)
+  {
+    $query = $connection->select('information_schema.TABLES', 'ist');
+    $query->addExpression('SUM(ist.data_length + ist.index_length)');
+    $query->condition('ist.table_schema', $connection->getConnectionOptions()['database']);
+    $query->condition('ist.table_name', 'cache%', 'LIKE');
+    return (float) $query->execute()->fetchField();
   }
 }
