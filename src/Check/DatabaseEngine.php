@@ -7,10 +7,9 @@
 namespace SiteAudit\Check;
 
 use SiteAudit\SiteAuditCheckBase;
-use Drupal\Core\Database\Database;
 
 /**
- * Provides the Database InnoDB check.
+ * Provides the Database Engine check.
  */
 class DatabaseEngine extends SiteAuditCheckBase {
 
@@ -45,14 +44,14 @@ class DatabaseEngine extends SiteAuditCheckBase {
   /**
    * {@inheritdoc}.
    */
-  public function getResultFail() {
-    return $this->simpleKeyValueList($this->t('Table Name'), $this->t('Engine'), $this->registry->engine_tables);
-  }
+  public function getResultFail() {}
 
   /**
    * {@inheritdoc}.
    */
-  public function getResultInfo() {}
+  public function getResultInfo() {
+    return $this->simpleKeyValueList($this->t('Table Name'), $this->t('Engine'), $this->registry->engine_tables);
+  }
 
   /**
    * {@inheritdoc}.
@@ -64,16 +63,16 @@ class DatabaseEngine extends SiteAuditCheckBase {
   /**
    * {@inheritdoc}.
    */
-  public function getResultWarn() {}
+  public function getResultWarn() {
+    return $this->getResultInfo();
+  }
 
   /**
    * {@inheritdoc}.
    */
   public function getAction() {
-    if ($this->score != SiteAuditCheckBase::AUDIT_CHECK_SCORE_PASS) {
-      return $this->t('Change the Storage Engine to InnoDB. See @url for details.', array(
-        '@url' => 'http://dev.mysql.com/doc/refman/5.6/en/converting-tables-to-innodb.html',
-      ));
+    if ($this->getScore() == SiteAuditCheckBase::AUDIT_CHECK_SCORE_WARN) {
+      return $this->t('In MySQL, run "ALTER TABLE table_name ENGINE=InnoDB;" on the affected tables.');
     }
   }
 
@@ -81,28 +80,58 @@ class DatabaseEngine extends SiteAuditCheckBase {
    * {@inheritdoc}.
    */
   public function calculateScore() {
-    if ($this->isDrupal7()) {
-      $connection = Database::getConnection();
-      $query = $connection->select('information_schema.TABLES', 'ist');
+    $this->registry->engine_tables = array();
+    try {
+      if ($this->isDrupal7()) {
+        $sql = "SELECT TABLE_NAME AS name, ENGINE AS engine FROM information_schema.TABLES WHERE TABLE_SCHEMA = :db_name AND ENGINE != 'InnoDB'";
+        $args = array(':db_name' => $this->getDatabaseName());
+        $result = db_query($sql, $args);
+      }
+      else {
+        $connection = \Drupal::database();
+        $result = $connection->query("SELECT TABLE_NAME AS name, ENGINE AS engine FROM information_schema.TABLES WHERE TABLE_SCHEMA = :db_name AND ENGINE != 'InnoDB'", [
+          ':db_name' => $connection->getConnectionOptions()['database'],
+        ]);
+      }
+
+      $count = 0;
+      foreach ($result as $row) {
+        $count++;
+        $this->registry->engine_tables[$row->name] = $row->engine;
+      }
+
+      if ($count === 0) {
+        return SiteAuditCheckBase::AUDIT_CHECK_SCORE_PASS;
+      }
+      return SiteAuditCheckBase::AUDIT_CHECK_SCORE_WARN;
     }
-    else {
-      $connection = \Drupal\Core\Database\Database::getConnection();
-      $query = Database::getConnection()->select('information_schema.TABLES', 'ist');
+    catch (\Exception $e) {
+      return SiteAuditCheckBase::AUDIT_CHECK_SCORE_FAIL;
     }
-    $query->addField('ist', 'TABLE_NAME', 'name');
-    $query->addField('ist', 'ENGINE', 'engine');
-    $query->condition('ist.ENGINE', 'InnoDB', '<>');
-    $query->condition('ist.table_schema', $connection->getConnectionOptions()['database']);
-    $result = $query->execute();
-    $count = 0;
-    while ($row = $result->fetchAssoc()) {
-      $count++;
-      $this->registry->engine_tables[$row['name']] = $row['engine'];
-    }
-    if ($count === 0) {
-      return SiteAuditCheckBase::AUDIT_CHECK_SCORE_PASS;
-    }
-    return SiteAuditCheckBase::AUDIT_CHECK_SCORE_FAIL;
   }
 
+  /**
+   * Check if the current Drupal version is 7.
+   *
+   * @return bool
+   *   TRUE if Drupal 7, FALSE otherwise.
+   */
+  protected function isDrupal7() {
+    return version_compare(VERSION, '8.0', '<');
+  }
+
+  /**
+   * Get the current database name.
+   *
+   * @return string
+   *   The name of the current database.
+   */
+  protected function getDatabaseName() {
+    if ($this->isDrupal7()) {
+      return db_query('SELECT DATABASE()')->fetchField();
+    }
+    else {
+      return \Drupal::database()->getConnectionOptions()['database'];
+    }
+  }
 }
