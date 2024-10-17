@@ -462,6 +462,8 @@ class SiteAuditCommands extends DrushCommands
 
         $registry->checksList = new ChecksRegistry();
 
+        $registry->container = \Drupal::hasContainer() ? \Drupal::getContainer() : null;
+
         return $registry;
     }
 
@@ -560,14 +562,20 @@ class SiteAuditCommands extends DrushCommands
             new \SiteAudit\Check\ViewsEnabled($registry, [], $excludes),
 
             // watchdog
-            new \SiteAudit\Check\Watchdog404($registry, [], $excludes),
-            new \SiteAudit\Check\WatchdogAge($registry, [], $excludes),
-            new \SiteAudit\Check\WatchdogCount($registry, [], $excludes),
             new \SiteAudit\Check\WatchdogEnabled($registry, [], $excludes),
-            new \SiteAudit\Check\WatchdogPhp($registry, [], $excludes),
-            new \SiteAudit\Check\WatchdogSyslog($registry, [], $excludes),
-
         ];
+
+        // Only add additional watchdog checks if dblog is enabled
+        if ($this->isDblogEnabled($registry)) {
+            $additionalWatchdogChecks = [
+                new \SiteAudit\Check\Watchdog404($registry, [], $excludes),
+                new \SiteAudit\Check\WatchdogAge($registry, [], $excludes),
+                new \SiteAudit\Check\WatchdogCount($registry, [], $excludes),
+                new \SiteAudit\Check\WatchdogPhp($registry, [], $excludes),
+                new \SiteAudit\Check\WatchdogSyslog($registry, [], $excludes),
+            ];
+            $checks = array_merge($checks, $additionalWatchdogChecks);
+        }
 
         return $checks;
     }
@@ -996,5 +1004,14 @@ class SiteAuditCommands extends DrushCommands
     protected function isDrupal7()
     {
         return !class_exists('\Drupal');
+    }
+
+    protected function isDblogEnabled($registry)
+    {
+        if ($this->isDrupal7()) {
+            return module_exists('dblog');
+        } else {
+            return $registry->container && $registry->container->get('module_handler')->moduleExists('dblog');
+        }
     }
 }
