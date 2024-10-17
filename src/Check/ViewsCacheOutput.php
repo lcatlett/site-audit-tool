@@ -90,12 +90,12 @@ class ViewsCacheOutput extends SiteAuditCheckBase
     }
 
     foreach ($views as $view) {
-      foreach ($view->display as $display_id => $display) {
-        if (is_object($display)) {
-          $display = (array) $display;
-        }
+      $displays = $this->isDrupal7() ? $view->display : $view->get('display');
+      foreach ($displays as $display_id => $display) {
+        $display = (array) $display;
         if (isset($display['display_options']['cache']['type']) && $display['display_options']['cache']['type'] != 'none') {
-          $this->registry->views_cache_output[$view->name][$display_id] = $display['display_options']['cache']['type'];
+          $view_name = $this->isDrupal7() ? $view->name : $view->id();
+          $this->registry->views_cache_output[$view_name][$display_id] = $display['display_options']['cache']['type'];
         }
       }
     }

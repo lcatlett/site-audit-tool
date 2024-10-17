@@ -110,21 +110,24 @@ class ViewsCacheResults extends SiteAuditCheckBase {
     }
 
     foreach ($views as $view) {
-      // Adjust the following line based on how view properties are accessed in Drupal 7 vs 8+
+      $view_id = $this->isDrupal7() ? $view->name : $view->id();
       $tag = $this->isDrupal7() ? $view->tag : $view->get('tag');
       if (in_array($tag, array('admin', 'commerce'))) {
         continue;
       }
-      foreach ($view->get('display') as $display_name => $display) {
+      foreach ($view->display as $display_name => $display) {
+        if (is_object($display)) {
+          $display = (array) $display;
+        }
         if (!isset($display['display_options']['enabled']) || $display['display_options']['enabled']) {
           // Default display OR overriding display.
           if (isset($display['display_options']['cache'])) {
             if ($display['display_options']['cache']['type'] == 'none' || ($display['display_options']['cache'] == '')) {
               if ($display_name == 'default') {
-                $this->registry->results_lifespan[$view->get('id')]['default'] = 'none';
+                $this->registry->results_lifespan[$view_id]['default'] = 'none';
               }
               else {
-                $this->registry->results_lifespan[$view->get('id')]['displays'][$display_name] = 'none';
+                $this->registry->results_lifespan[$view_id]['displays'][$display_name] = 'none';
               }
             }
             elseif ($display['display_options']['cache']['type'] == 'time') {
@@ -138,24 +141,24 @@ class ViewsCacheResults extends SiteAuditCheckBase {
                 $lifespan = 'none';
               }
               if ($display_name == 'default') {
-                $this->registry->results_lifespan[$view->get('id')]['default'] = $lifespan;
+                $this->registry->results_lifespan[$view_id]['default'] = $lifespan;
               }
               else {
-                $this->registry->results_lifespan[$view->get('id')]['displays'][$display_name] = $lifespan;
+                $this->registry->results_lifespan[$view_id]['displays'][$display_name] = $lifespan;
               }
             }
             elseif ($display['display_options']['cache']['type'] == 'tag') {
               if ($display_name == 'default') {
-                $this->registry->results_lifespan[$view->get('id')]['default'] = 'tag';
+                $this->registry->results_lifespan[$view_id]['default'] = 'tag';
               }
               else {
-                $this->registry->results_lifespan[$view->get('id')]['displays'][$display_name] = 'tag';
+                $this->registry->results_lifespan[$view_id]['displays'][$display_name] = 'tag';
               }
             }
           }
           // Display is using default display's caching.
           else {
-            $this->registry->results_lifespan[$view->get('id')]['displays'][$display_name] = 'default';
+            $this->registry->results_lifespan[$view_id]['displays'][$display_name] = 'default';
           }
         }
       }
@@ -208,6 +211,10 @@ class ViewsCacheResults extends SiteAuditCheckBase {
       return SiteAuditCheckBase::AUDIT_CHECK_SCORE_FAIL;
     }
     return SiteAuditCheckBase::AUDIT_CHECK_SCORE_WARN;
+  }
+
+  protected function isDrupal7() {
+    return version_compare(VERSION, '8.0', '<');
   }
 
 }

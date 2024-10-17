@@ -78,11 +78,7 @@ class BlockEnabled extends SiteAuditCheckBase {
    * {@inheritdoc}.
    */
   public function calculateScore() {
-    if ($this->isDrupal7()) {
-      return $this->calculateScoreDrupal7();
-    } else {
-      return $this->calculateScoreDrupal8Plus();
-    }
+    return $this->isDrupal7() ? $this->calculateScoreDrupal7() : $this->calculateScoreDrupal8Plus();
   }
 
   /**
@@ -113,6 +109,16 @@ class BlockEnabled extends SiteAuditCheckBase {
       return SiteAuditCheckBase::AUDIT_CHECK_SCORE_WARN;
     }
     return SiteAuditCheckBase::AUDIT_CHECK_SCORE_PASS;
+  }
+
+  /**
+   * Check if the current Drupal version is 7.
+   *
+   * @return bool
+   *   TRUE if Drupal 7, FALSE otherwise.
+   */
+  protected function isDrupal7() {
+    return version_compare(VERSION, '8.0', '<');
   }
 
 }
