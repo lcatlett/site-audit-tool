@@ -184,7 +184,11 @@ class StatusSystem extends SiteAuditCheckBase {
     // Check run-time requirements and status information.
     $this->registry->requirements = module_invoke_all('requirements', 'runtime');
     drupal_alter('requirements', $this->registry->requirements);
-    uasort($this->registry->requirements, 'drupal_sort_severity');
+    if ($this->isDrupal7()) {
+      uasort($this->registry->requirements, 'drupal_sort_severity');
+    } else {
+      uasort($this->registry->requirements, ['Drupal\Core\Extension\ModuleHandler', 'sortByWeightAndTitle']);
+    }
 
     return $this->calculateFinalScore();
   }
@@ -200,7 +204,11 @@ class StatusSystem extends SiteAuditCheckBase {
     // Check run-time requirements and status information.
     $this->registry->requirements = \Drupal::moduleHandler()->invokeAll('requirements', ['runtime']);
     \Drupal::moduleHandler()->alter('requirements', $this->registry->requirements);
-    uasort($this->registry->requirements, ['Drupal\Core\Extension\ModuleHandler', 'sortByWeightAndTitle']);
+    if ($this->isDrupal7()) {
+      uasort($this->registry->requirements, 'drupal_sort_severity');
+    } else {
+      uasort($this->registry->requirements, ['Drupal\Core\Extension\ModuleHandler', 'sortByWeightAndTitle']);
+    }
 
     return $this->calculateFinalScore();
   }
@@ -230,6 +238,10 @@ class StatusSystem extends SiteAuditCheckBase {
 
     $this->percentOverride = min($this->percentOverride, 100);
     return $this->percentOverride;
+  }
+
+  protected function isDrupal7() {
+    return version_compare(VERSION, '8.0', '<');
   }
 
 }
