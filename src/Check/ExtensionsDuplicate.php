@@ -113,9 +113,8 @@ class ExtensionsDuplicate extends SiteAuditCheckBase {
   public function calculateScore() {
     $this->registry->extensions_dupe = array();
     $drupal_root = DRUPAL_ROOT;
-    $settings = \Drupal::service('settings');
-    $kernel = \Drupal::service('kernel');
-    $command = "find $drupal_root -xdev -type f -name '*.info.yml' -o -path './" . $settings->get('file_public_path', $kernel->getSitePath() . '/files') . "' -prune";
+    $settings = $this->isDrupal7() ? variable_get('file_public_path', conf_path() . '/files') : \Drupal::service('site.path') . '/files';
+    $command = "find $drupal_root -xdev -type f -name '*.info.yml' -o -path './" . $settings . "' -prune";
     exec($command, $result);
 
     foreach ($result as $path) {
@@ -257,5 +256,15 @@ class ExtensionsDuplicate extends SiteAuditCheckBase {
       function ($instances) {
         return count($instances) > 1;
       });
+  }
+
+  /**
+   * Check if the current Drupal version is 7.
+   *
+   * @return bool
+   *   TRUE if Drupal 7, FALSE otherwise.
+   */
+  protected function isDrupal7() {
+    return version_compare(VERSION, '8.0', '<');
   }
 }

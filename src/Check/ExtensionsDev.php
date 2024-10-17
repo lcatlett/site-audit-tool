@@ -65,15 +65,16 @@ class ExtensionsDev extends SiteAuditCheckBase {
    * {@inheritdoc}.
    */
   public function getResultWarn() {
+    if (empty($this->registry->extensions_dev)) {
+      return $this->t('No development modules were detected.');
+    }
+    
     $ret_val = $this->t('The following development modules(s) are currently enabled: @list', array(
       '@list' => implode(', ', array_keys($this->registry->extensions_dev)),
     ));
-    $show_table = TRUE;
-    if (SiteAuditEnvironment::isDev()) {
-      $show_table = FALSE;
-    }
+    $show_table = !SiteAuditEnvironment::isDev();
 
-    if ($this->registry->detail) {
+    if ($this->registry->detail && $show_table) {
       $data = $this->rowsToKeyValueList($this->registry->extensions_dev);
       $ret_val .= $this->linebreak();
       $ret_val .= $this->simpleKeyValueList($this->t('Name'), $this->t('Reason'), $data);
@@ -101,31 +102,39 @@ class ExtensionsDev extends SiteAuditCheckBase {
    */
   public function calculateScore() {
     $dev_modules = $this->getExtensions();
-    $enabled_dev_modules = [];
+    $this->registry->extensions_dev = [];
 
     if ($this->isDrupal7()) {
       $modules = module_list();
       foreach ($dev_modules as $dev_module => $reason) {
         if (isset($modules[$dev_module])) {
-          $enabled_dev_modules[$dev_module] = $reason;
+          $this->registry->extensions_dev[$dev_module] = $reason;
         }
       }
     } else {
-      $modules = \Drupal::moduleHandler()->getModuleList();
+      $moduleHandler = \Drupal::service('module_handler');
+      $modules = $moduleHandler->getModuleList();
       foreach ($dev_modules as $dev_module => $reason) {
         if (isset($modules[$dev_module])) {
-          $enabled_dev_modules[$dev_module] = $reason;
+          $this->registry->extensions_dev[$dev_module] = $reason;
         }
       }
     }
 
-    if (!empty($enabled_dev_modules)) {
-      if (SiteAuditEnvironment::isDev()) {
-        return SiteAuditCheckBase::AUDIT_CHECK_SCORE_INFO;
-      }
-      return SiteAuditCheckBase::AUDIT_CHECK_SCORE_WARN;
+    if (!empty($this->registry->extensions_dev)) {
+      return SiteAuditEnvironment::isDev() ? SiteAuditCheckBase::AUDIT_CHECK_SCORE_INFO : SiteAuditCheckBase::AUDIT_CHECK_SCORE_WARN;
     }
     return SiteAuditCheckBase::AUDIT_CHECK_SCORE_PASS;
+  }
+
+  /**
+   * Check if the current Drupal version is 7.
+   *
+   * @return bool
+   *   TRUE if Drupal 7, FALSE otherwise.
+   */
+  protected function isDrupal7() {
+    return version_compare(VERSION, '8.0', '<');
   }
 
   /**
