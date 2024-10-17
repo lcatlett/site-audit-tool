@@ -95,7 +95,7 @@ class WatchdogAge extends SiteAuditCheckBase {
     if ($this->isDrupal7()) {
       $query = db_select('watchdog');
     } else {
-      $query = Database::getConnection()->select('watchdog');
+      $query = \Drupal::database()->select('watchdog');
     }
     $query->addField('watchdog', 'timestamp');
     $query->orderBy('wid', 'ASC');
@@ -105,7 +105,7 @@ class WatchdogAge extends SiteAuditCheckBase {
     if ($this->isDrupal7()) {
       $query = db_select('watchdog');
     } else {
-      $query = Database::getConnection()->select('watchdog');
+      $query = \Drupal::database()->select('watchdog');
     }
     $query->addField('watchdog', 'timestamp');
     $query->orderBy('wid', 'DESC');
@@ -115,4 +115,7 @@ class WatchdogAge extends SiteAuditCheckBase {
     return SiteAuditCheckBase::AUDIT_CHECK_SCORE_INFO;
   }
 
+  protected function isDrupal7() {
+    return version_compare(VERSION, '8.0', '<');
+  }
 }

@@ -99,9 +99,9 @@ class ViewsCount extends SiteAuditCheckBase {
       }
     } else {
       if (\Drupal::moduleHandler()->moduleExists('views')) {
-        foreach (Views::getEnabledViews() as $view) {
-          $this->registry->views[] = $view;
-        }
+        $this->registry->views = \Drupal::entityTypeManager()
+          ->getStorage('view')
+          ->loadMultiple();
       }
     }
 
@@ -119,6 +119,6 @@ class ViewsCount extends SiteAuditCheckBase {
    *   TRUE if Drupal 7, FALSE otherwise.
    */
   protected function isDrupal7() {
-    return version_compare(drush_drupal_version(), '8.0', '<');
+    return version_compare(VERSION, '8.0', '<');
   }
 }

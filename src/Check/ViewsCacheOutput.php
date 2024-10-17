@@ -103,6 +103,7 @@ class ViewsCacheOutput extends SiteAuditCheckBase {
     if (empty($this->registry->views)) {
       $this->checkInvokeCalculateScore('views_count');
     }
+    
     if ($this->isDrupal7()) {
       $views = views_get_all_views();
     } else {
@@ -110,52 +111,32 @@ class ViewsCacheOutput extends SiteAuditCheckBase {
     }
 
     foreach ($views as $view) {
-      // Adjust the following line based on how view properties are accessed in Drupal 7 vs 8+
+      $view_id = $this->isDrupal7() ? $view->name : $view->id();
       $tag = $this->isDrupal7() ? $view->tag : $view->get('tag');
       if (in_array($tag, array('admin', 'commerce'))) {
         continue;
       }
-      foreach ($view->get('display') as $display_name => $display) {
+      
+      $displays = $this->isDrupal7() ? $view->display : $view->get('display');
+      foreach ($displays as $display_name => $display) {
         if (!isset($display['display_options']['enabled']) || $display['display_options']['enabled']) {
           // Default display OR overriding display.
           if (isset($display['display_options']['cache'])) {
-            if ($display['display_options']['cache']['type'] == 'none' || ($display['display_options']['cache'] == '')) {
-              if ($display_name == 'default') {
-                $this->registry->output_lifespan[$view->get('id')]['default'] = 'none';
-              }
-              else {
-                $this->registry->output_lifespan[$view->get('id')]['displays'][$display_name] = 'none';
-              }
+            $cache_type = $display['display_options']['cache']['type'];
+            if ($cache_type == 'none' || $cache_type == '') {
+              $this->setOutputLifespan($view_id, $display_name, 'none');
             }
-            elseif ($display['display_options']['cache']['type'] == 'time') {
-              if ($display['display_options']['cache']['options']['output_lifespan'] == 0) {
-                $lifespan = $display['display_options']['cache']['options']['output_lifespan_custom'];
-              }
-              else {
-                $lifespan = $display['display_options']['cache']['options']['output_lifespan'];
-              }
-              if ($lifespan < 1) {
-                $lifespan = 'none';
-              }
-              if ($display_name == 'default') {
-                $this->registry->output_lifespan[$view->get('id')]['default'] = $lifespan;
-              }
-              else {
-                $this->registry->output_lifespan[$view->get('id')]['displays'][$display_name] = $lifespan;
-              }
+            elseif ($cache_type == 'time') {
+              $lifespan = $this->getTimeLifespan($display['display_options']['cache']['options']);
+              $this->setOutputLifespan($view_id, $display_name, $lifespan);
             }
-            elseif ($display['display_options']['cache']['type'] == 'tag') {
-              if ($display_name == 'default') {
-                $this->registry->output_lifespan[$view->get('id')]['default'] = 'tag';
-              }
-              else {
-                $this->registry->output_lifespan[$view->get('id')]['displays'][$display_name] = 'tag';
-              }
+            elseif ($cache_type == 'tag') {
+              $this->setOutputLifespan($view_id, $display_name, 'tag');
             }
           }
           // Display is using default display's caching.
           else {
-            $this->registry->output_lifespan[$view->get('id')]['displays'][$display_name] = 'default';
+            $this->setOutputLifespan($view_id, $display_name, 'default');
           }
         }
       }
@@ -164,39 +145,7 @@ class ViewsCacheOutput extends SiteAuditCheckBase {
     $this->registry->views_without_output_caching = array();
 
     foreach ($this->registry->output_lifespan as $view_name => $view_data) {
-      // Views with only master display.
-      if (!isset($view_data['displays']) || (count($view_data['displays']) == 0)) {
-        if ($view_data['default'] == 'none') {
-          $this->registry->views_without_output_caching[] = $view_name;
-        }
-      }
-      else {
-        // If all the displays are default, consolidate.
-        $all_default_displays = TRUE;
-        foreach ($view_data['displays'] as $display_name => $lifespan) {
-          if ($lifespan != 'default') {
-            $all_default_displays = FALSE;
-          }
-        }
-        if ($all_default_displays) {
-          if ($view_data['default'] == 'none') {
-            $this->registry->views_without_output_caching[] = $view_name;
-          }
-        }
-        else {
-          $uncached_view_string = $view_name;
-          $uncached_view_displays = array();
-          foreach ($view_data['displays'] as $display_name => $display_data) {
-            if ($display_data == 'none' || ($display_data == 'default' && $view_data['default'] == 'none')) {
-              $uncached_view_displays[] = $display_name;
-            }
-          }
-          if (!empty($uncached_view_displays)) {
-            $uncached_view_string .= ' (' . implode(', ', $uncached_view_displays) . ')';
-            $this->registry->views_without_output_caching[] = $uncached_view_string;
-          }
-        }
-      }
+      $this->processViewCaching($view_name, $view_data);
     }
 
     if (count($this->registry->views_without_output_caching) == 0) {
@@ -211,4 +160,72 @@ class ViewsCacheOutput extends SiteAuditCheckBase {
     return SiteAuditCheckBase::AUDIT_CHECK_SCORE_WARN;
   }
 
+  /**
+   * Set output lifespan for a view display.
+   */
+  private function setOutputLifespan($view_id, $display_name, $lifespan) {
+    if ($display_name == 'default') {
+      $this->registry->output_lifespan[$view_id]['default'] = $lifespan;
+    } else {
+      $this->registry->output_lifespan[$view_id]['displays'][$display_name] = $lifespan;
+    }
+  }
+
+  /**
+   * Get time lifespan from cache options.
+   */
+  private function getTimeLifespan($options) {
+    if (!isset($options['output_lifespan'])) {
+      return 'none';
+    }
+    if ($options['output_lifespan'] == 0) {
+      $lifespan = isset($options['output_lifespan_custom']) ? $options['output_lifespan_custom'] : 0;
+    } else {
+      $lifespan = $options['output_lifespan'];
+    }
+    return $lifespan < 1 ? 'none' : $lifespan;
+  }
+
+  /**
+   * Process view caching data.
+   */
+  private function processViewCaching($view_name, $view_data) {
+    // Views with only master display.
+    if (!isset($view_data['displays']) || (count($view_data['displays']) == 0)) {
+      if ($view_data['default'] == 'none') {
+        $this->registry->views_without_output_caching[] = $view_name;
+      }
+    } else {
+      // If all the displays are default, consolidate.
+      $all_default_displays = !array_filter($view_data['displays'], function($lifespan) {
+        return $lifespan != 'default';
+      });
+      
+      if ($all_default_displays) {
+        if ($view_data['default'] == 'none') {
+          $this->registry->views_without_output_caching[] = $view_name;
+        }
+      } else {
+        $uncached_view_displays = array();
+        foreach ($view_data['displays'] as $display_name => $display_data) {
+          if ($display_data == 'none' || ($display_data == 'default' && $view_data['default'] == 'none')) {
+            $uncached_view_displays[] = $display_name;
+          }
+        }
+        if (!empty($uncached_view_displays)) {
+          $this->registry->views_without_output_caching[] = $view_name . ' (' . implode(', ', $uncached_view_displays) . ')';
+        }
+      }
+    }
+  }
+
+  /**
+   * Check if the current Drupal version is 7.
+   *
+   * @return bool
+   *   TRUE if Drupal 7, FALSE otherwise.
+   */
+  protected function isDrupal7() {
+    return version_compare(VERSION, '8.0', '<');
+  }
 }

@@ -100,7 +100,7 @@ class WatchdogPhp extends SiteAuditCheckBase {
     if ($this->isDrupal7()) {
       $query = db_select('watchdog');
     } else {
-      $query = Database::getConnection()->select('watchdog');
+      $query = \Drupal::database()->select('watchdog');
     }
     $query->addExpression('COUNT(*)', 'count');
     $query->addField('watchdog', 'severity');
@@ -141,6 +141,10 @@ class WatchdogPhp extends SiteAuditCheckBase {
       RfcLogLevel::INFO => 'info',
       RfcLogLevel::DEBUG => 'debug',
     );
+  }
+
+  protected function isDrupal7() {
+    return version_compare(VERSION, '8.0', '<');
   }
 
 }

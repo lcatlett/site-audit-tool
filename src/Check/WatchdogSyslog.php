@@ -105,4 +105,8 @@ class WatchdogSyslog extends SiteAuditCheckBase {
       return \Drupal::moduleHandler()->moduleExists('syslog');
     }
   }
+
+  protected function isDrupal7() {
+    return version_compare(VERSION, '8.0', '<');
+  }
 }

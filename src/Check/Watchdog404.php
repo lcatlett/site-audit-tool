@@ -93,13 +93,11 @@ class Watchdog404 extends SiteAuditCheckBase {
     }
     if ($this->isDrupal7()) {
       $query = db_select('watchdog');
-      $query->addExpression('COUNT(wid)', 'count');
-      $query->condition('type', 'page not found');
     } else {
-      $query = Database::getConnection()->select('watchdog');
-      $query->addExpression('COUNT(wid)', 'count');
-      $query->condition('type', 'page not found');
+      $query = \Drupal::database()->select('watchdog');
     }
+    $query->addExpression('COUNT(wid)', 'count');
+    $query->condition('type', 'page not found');
     $this->registry->count_404 = $query->execute()->fetchField();
 
     $this->registry->percent_404 = 0;
@@ -115,4 +113,7 @@ class Watchdog404 extends SiteAuditCheckBase {
     return SiteAuditCheckBase::AUDIT_CHECK_SCORE_INFO;
   }
 
+  protected function isDrupal7() {
+    return version_compare(VERSION, '8.0', '<');
+  }
 }

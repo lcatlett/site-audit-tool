@@ -74,7 +74,10 @@ class ViewsEnabled extends SiteAuditCheckBase {
    * {@inheritdoc}.
    */
   public function calculateScore() {
-    $this->registry->views_enabled = $this->isDrupal7() ? module_exists('views') : \Drupal::moduleHandler()->moduleExists('views');
+    $this->registry->views_enabled = $this->isDrupal7() 
+      ? module_exists('views') 
+      : \Drupal::moduleHandler()->moduleExists('views');
+    
     if (!$this->registry->views_enabled) {
       $this->abort = TRUE;
       return SiteAuditCheckBase::AUDIT_CHECK_SCORE_INFO;
@@ -82,4 +85,7 @@ class ViewsEnabled extends SiteAuditCheckBase {
     return SiteAuditCheckBase::AUDIT_CHECK_SCORE_PASS;
   }
 
+  protected function isDrupal7() {
+    return version_compare(VERSION, '8.0', '<');
+  }
 }
