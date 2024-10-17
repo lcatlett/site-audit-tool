@@ -96,8 +96,7 @@ class DatabaseCollation extends SiteAuditCheckBase
     try {
       $this->registry->collation_tables = [];
       $connection = $this->getDatabaseConnection();
-      $query = $this->getCollationQuery($connection);
-      $result = $query->execute();
+      $result = $this->getCollationQuery($connection);
 
       if ($result === FALSE) {
         throw new \Exception('Query execution failed.');
@@ -105,16 +104,14 @@ class DatabaseCollation extends SiteAuditCheckBase
 
       $count = 0;
       $warn = FALSE;
-      while ($row = $result->fetchAssoc()) {
-        // Skip odd utf8 variants we might not know about explicitly
-        if (strpos($row['collation'], 'utf8') !== FALSE) {
-          continue;
+      
+      if ($this->isDrupal7()) {
+        while ($row = $result->fetchAssoc()) {
+          $this->processRow($row, $count, $warn);
         }
-        $count++;
-        $this->registry->collation_tables[$row['name']] = $row['collation'];
-        // Special case for old imports.
-        if ($row['collation'] == 'latin1_swedish_ci') {
-          $warn = TRUE;
+      } else {
+        foreach ($result as $row) {
+          $this->processRow($row, $count, $warn);
         }
       }
 
@@ -127,6 +124,30 @@ class DatabaseCollation extends SiteAuditCheckBase
       return SiteAuditCheckBase::AUDIT_CHECK_SCORE_INFO;
     } catch (\Exception $e) {
       return SiteAuditCheckBase::AUDIT_CHECK_SCORE_FAIL;
+    }
+  }
+
+  /**
+   * Process a single row of the collation query result.
+   *
+   * @param array $row
+   *   The row data.
+   * @param int $count
+   *   The count of non-UTF-8 tables.
+   * @param bool $warn
+   *   Whether to set a warning flag.
+   */
+  protected function processRow($row, &$count, &$warn)
+  {
+    // Skip odd utf8 variants we might not know about explicitly
+    if (strpos($row['collation'], 'utf8') !== FALSE) {
+      return;
+    }
+    $count++;
+    $this->registry->collation_tables[$row['name']] = $row['collation'];
+    // Special case for old imports.
+    if ($row['collation'] == 'latin1_swedish_ci') {
+      $warn = TRUE;
     }
   }
 
@@ -148,25 +169,24 @@ class DatabaseCollation extends SiteAuditCheckBase
   /**
    * Get the collation query.
    *
-   * @param \Drupal\Core\Database\Connection|\DatabaseConnection $connection
+   * @param mixed $connection
    *   The database connection.
    *
-   * @return \Drupal\Core\Database\Query\Select|\SelectQuery
-   *   The collation query.
+   * @return mixed
+   *   The collation query result.
    */
   protected function getCollationQuery($connection)
   {
     if ($this->isDrupal7()) {
       $database_name = $this->getDatabaseName();
-      $query = db_query("SELECT TABLE_NAME AS name, TABLE_COLLATION AS collation FROM information_schema.TABLES WHERE TABLE_SCHEMA = '$database_name' AND TABLE_COLLATION NOT IN ('utf8_general_ci', 'utf8_unicode_ci', 'utf8_bin', 'utf8mb4_general_ci')");
-      return $query;
+      return db_query("SELECT TABLE_NAME AS name, TABLE_COLLATION AS collation FROM information_schema.TABLES WHERE TABLE_SCHEMA = :database AND TABLE_COLLATION NOT IN ('utf8_general_ci', 'utf8_unicode_ci', 'utf8_bin', 'utf8mb4_general_ci')", [':database' => $database_name]);
     } else {
       $query = $connection->select('information_schema.TABLES', 'ist');
       $query->addField('ist', 'TABLE_NAME', 'name');
       $query->addField('ist', 'TABLE_COLLATION', 'collation');
-      $query->condition('ist.TABLE_COLLATION', array('utf8_general_ci', 'utf8_unicode_ci', 'utf8_bin', 'utf8mb4_general_ci'), 'NOT IN');
+      $query->condition('ist.TABLE_COLLATION', ['utf8_general_ci', 'utf8_unicode_ci', 'utf8_bin', 'utf8mb4_general_ci'], 'NOT IN');
       $query->condition('ist.table_schema', $this->getDatabaseName());
-      return $query;
+      return $query->execute();
     }
   }
 
