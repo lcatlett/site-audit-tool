@@ -2,13 +2,10 @@
 
 namespace SiteAudit;
 
-use Drupal\Core\StringTranslation\StringTranslationTrait;
-
 /**
  * Base class for Site Audit Check plugins.
  */
 abstract class SiteAuditCheckBase implements SiteAuditCheckInterface {
-    use StringTranslationTrait;
 
     const AUDIT_CHECK_SCORE_INFO = 3;
     const AUDIT_CHECK_SCORE_PASS = 2;
@@ -334,7 +331,7 @@ abstract class SiteAuditCheckBase implements SiteAuditCheckInterface {
         if ($this->isDrupal7()) {
             return t($string, $args, $options);
         } else {
-            return $this->formatPlural(1, $string, $string, $args, $options);
+            return \Drupal::translation()->translate($string, $args, $options);
         }
     }
 }
