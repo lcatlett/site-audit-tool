@@ -72,16 +72,18 @@ class CacheBinsAll extends SiteAuditCheckBase {
    * {@inheritdoc}.
    */
   public function calculateScore() {
+    $this->registry->cache_bins_all = array();
+
     if ($this->isDrupal7()) {
-      $this->registry->cache_bins_all = array();
-      foreach (cache_get_bins() as $bin => $cache) {
-        $this->registry->cache_bins_all[$bin] = get_class($cache);
+      $query = db_query("SHOW TABLES LIKE 'cache' UNION SHOW TABLES LIKE 'cache_%'");
+      foreach ($query as $row) {
+        $table_name = reset($row);
+        $this->registry->cache_bins_all[$table_name] = 'DrupalDatabaseCache';
       }
     } else {
       $container = \Drupal::getContainer();
       $services = $container->getServiceIds();
 
-      $this->registry->cache_bins_all = array();
       $back_ends = preg_grep('/^cache\.backend\./', array_values($services));
       foreach ($back_ends as $backend) {
         $this->registry->cache_bins_all[$backend] = get_class($container->get($backend));
