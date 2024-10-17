@@ -755,6 +755,7 @@ class SiteAuditCommands extends DrushCommands
 
         // Add environment variables report if enabled
         if ($includeEnvVars) {
+            // Todo: fix env-vars option
             //$markdown .= $this->generateEnvironmentVariablesReport();
         }
 
