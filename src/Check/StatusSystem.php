@@ -167,11 +167,7 @@ class StatusSystem extends SiteAuditCheckBase
     // Check run-time requirements and status information.
     $this->registry->requirements = module_invoke_all('requirements', 'runtime');
     drupal_alter('requirements', $this->registry->requirements);
-    if ($this->isDrupal7()) {
-      uasort($this->registry->requirements, 'drupal_sort_severity');
-    } else {
-      uasort($this->registry->requirements, [$this, 'sortRequirements']);
-    }
+    uasort($this->registry->requirements, [$this, 'sortRequirements']);
 
     return $this->calculateFinalScore();
   }
@@ -188,11 +184,7 @@ class StatusSystem extends SiteAuditCheckBase
     // Check run-time requirements and status information.
     $this->registry->requirements = \Drupal::moduleHandler()->invokeAll('requirements', ['runtime']);
     \Drupal::moduleHandler()->alter('requirements', $this->registry->requirements);
-    if ($this->isDrupal7()) {
-      uasort($this->registry->requirements, 'drupal_sort_severity');
-    } else {
-      uasort($this->registry->requirements, [$this, 'sortRequirements']);
-    }
+    uasort($this->registry->requirements, [$this, 'sortRequirements']);
 
     return $this->calculateFinalScore();
   }
