@@ -11,6 +11,7 @@ use SiteAudit\ChecksRegistry;
 use SiteAudit\SiteAuditCheckBase;
 use SiteAudit\SiteAuditCheckInterface;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 
 /**
  * Edit this file to reflect your organization's needs.
@@ -54,9 +55,16 @@ class SiteAuditCommands extends DrushCommands
     /**
      * @command audit:reports
      * @aliases aa
-     * @return array
+     * @option format The output format (json, html, or markdown).
+     * @option detail Show detailed results.
+     * @option vendor Vendor-specific checks to include.
+     * @option skip Checks to skip.
+     * @usage drush audit:reports --format=json
+     * @usage drush audit:reports --markdown
      *
      * @param string $param A parameter
+     * @return array
+     *
      * @bootstrap full
      *
      * Combine all of our reports
@@ -71,6 +79,7 @@ class SiteAuditCommands extends DrushCommands
             'detail' => false,
             'vendor' => '',
             'skip' => [],
+            'env-vars' => false,
         ]
     ) {
         $this->init();
@@ -94,24 +103,40 @@ class SiteAuditCommands extends DrushCommands
         $checks = $this->interimInstantiateChecks($this->createRegistry($options), $skipped);
         $result = $this->interimBuildReports($checks);
 
-        // Hack: avoid using the output format when `--json` is specified.
-        // At the moment, the output formatter
-        // insists on always pretty-printing with JSON_PRETTY_PRINT, but
-        // the Pantheon dashboard expects non-pretty json, and does not
-        // parse correctly with the extra whitespace.
+        // Add database size information to the result
+        $dbSizeInfo = $this->extractDatabaseSizeInfo($result);
+        if ($dbSizeInfo) {
+            $result['database_size_info'] = $dbSizeInfo;
+        }
+
         if ($options['json']) {
-            print json_encode($result);
+            print json_encode($result, JSON_PRETTY_PRINT);
+            return null;
+        }
+
+        if ($options['html']) {
+            print $this->generateHtmlReport($result);
             return null;
         }
 
         if ($options['markdown']) {
-            $markdown = $this->generateMarkdownReport($result);
+            $markdown = $this->generateMarkdownReport($result, $options['env-vars']);
             print $markdown;
             return null;
         }
 
         // Otherwise, use the output formatter
         return $result;
+    }
+
+    /**
+     * @hook option audit:reports
+     */
+    public function optionEnvVars(&$options) {
+        $options['env-vars'] = [
+            'description' => 'Include environment variables report.',
+            'default' => false,
+        ];
     }
 
     /**
@@ -236,7 +261,7 @@ class SiteAuditCommands extends DrushCommands
      *
      * @bootstrap full
      *
-     * Audit blocks.
+     * Audit cron.
      */
     public function auditCron(
         $options = [
@@ -263,7 +288,7 @@ class SiteAuditCommands extends DrushCommands
      *
      * @bootstrap full
      *
-     * Audit blocks.
+     * Audit database.
      */
     public function auditDatabase(
         $options = [
@@ -692,7 +717,7 @@ class SiteAuditCommands extends DrushCommands
         return str_replace('\\', '', $full_class_name);
     }
 
-    protected function generateMarkdownReport($result)
+    protected function generateMarkdownReport($result, $includeEnvVars = false)
     {
         $markdown = "# Site Audit Report\n\n";
         $markdown .= "Generated on: " . date('Y-m-d H:i:s', $result['time']) . "\n\n";
@@ -702,8 +727,36 @@ class SiteAuditCommands extends DrushCommands
         $markdown .= "| Key | Value |\n";
         $markdown .= "|-----|-------|\n";
         $markdown .= "| Environment | " . $this->getEnvironment() . " |\n";
-        $markdown .= "| Drush Alias | " . $this->getDrushAlias() . " |\n";
         $markdown .= "| Site URI | " . $this->getSiteUri() . " |\n\n";
+
+        // Add database size information
+        $markdown .= "## Database Size Information\n\n";
+        $markdown .= "| Metric | Value |\n";
+        $markdown .= "|--------|-------|\n";
+
+        // Extract information from the result string
+        $resultLines = explode('<br>', $result['database_size_info']['result']);
+        foreach ($resultLines as $line) {
+            $parts = explode(': ', $line, 2);
+            if (count($parts) == 2) {
+                $markdown .= "| " . trim($parts[0]) . " | " . trim($parts[1]) . " |\n";
+            }
+        }
+
+        $markdown .= "\n";
+
+        if (isset($result['database_size_info']['score']) && $result['database_size_info']['score'] == SiteAuditCheckBase::AUDIT_CHECK_SCORE_WARN) {
+            $markdown .= "**Warning:** " . ($result['database_size_info']['result'] ?? 'High cache table usage detected.') . "\n\n";
+        }
+
+        if (!empty($result['database_size_info']['action'])) {
+            $markdown .= "**Recommended Action:** " . $result['database_size_info']['action'] . "\n\n";
+        }
+
+        // Add environment variables report if enabled
+        if ($includeEnvVars) {
+            //$markdown .= $this->generateEnvironmentVariablesReport();
+        }
 
         foreach ($result['reports'] as $reportKey => $report) {
             $markdown .= "## " . $report['label'] . "\n\n";
@@ -726,6 +779,69 @@ class SiteAuditCommands extends DrushCommands
         }
 
         return $markdown;
+    }
+
+    protected function generateEnvironmentVariablesReport()
+    {
+        $markdown = "## Environment Variables Report\n\n";
+
+        $envVars = $this->getAllEnvironmentVariables();
+        $totalVars = count($envVars);
+        $sensitiveVars = $this->countSensitiveVariables($envVars);
+
+        $markdown .= "**Total Variables:** $totalVars\n\n";
+        $markdown .= "**Potentially Sensitive Variables:** $sensitiveVars\n\n";
+
+        $markdown .= "### Variable List\n\n";
+        $markdown .= "| Variable | Value |\n";
+        $markdown .= "|----------|-------|\n";
+
+        foreach ($envVars as $key => $value) {
+            $safeValue = $this->sanitizeValue($key, $value);
+            $markdown .= "| $key | $safeValue |\n";
+        }
+
+        $markdown .= "\n";
+
+        return $markdown;
+    }
+
+    protected function getAllEnvironmentVariables()
+    {
+        $envVars = getenv();
+        ksort($envVars); // Sort variables alphabetically by key
+        return $envVars;
+    }
+
+    protected function countSensitiveVariables($envVars)
+    {
+        $sensitiveKeywords = ['password', 'secret', 'token', 'key', 'api'];
+        $count = 0;
+
+        foreach ($envVars as $key => $value) {
+            foreach ($sensitiveKeywords as $keyword) {
+                if (stripos($key, $keyword) !== false) {
+                    $count++;
+                    break;
+                }
+            }
+        }
+
+        return $count;
+    }
+
+    protected function sanitizeValue($key, $value)
+    {
+        $sensitiveKeywords = ['password', 'secret', 'token', 'key', 'api'];
+        
+        foreach ($sensitiveKeywords as $keyword) {
+            if (stripos($key, $keyword) !== false) {
+                return '[REDACTED]';
+            }
+        }
+
+        // Escape pipe characters to prevent breaking the markdown table
+        return str_replace('|', '\\|', $value);
     }
 
     protected function getScoreEmoji($score)
@@ -753,13 +869,122 @@ class SiteAuditCommands extends DrushCommands
 
     protected function getDrushAlias()
     {
-        // You may need to adjust this based on how you retrieve the Drush alias
-        return drush_get_context('DRUSH_ALIAS') ?: 'None';
+        // For Drush 8 (Drupal 7)
+        if (function_exists('drush_get_context')) {
+            return drush_get_context('DRUSH_ALIAS') ?: 'None';
+        }
+        
+        // For Drush 9 and later
+        if (class_exists('\Drush\Drush')) {
+            $aliasManager = \Drush\Drush::aliasManager();
+            $selfAlias = $aliasManager->getSelf();
+            return $selfAlias->name();
+        }
+        
+        // Fallback for cases where we can't determine the alias
+        return 'None';
     }
 
     protected function getSiteUri()
     {
-        // You may need to adjust this based on how you retrieve the site URI
-        return \Drupal::request()->getSchemeAndHttpHost() . \Drupal::request()->getBaseUrl();
+        // For Drupal 7
+        if (function_exists('variable_get')) {
+            $base_url = variable_get('site_url', '');
+            if ($base_url) {
+                return $base_url;
+            }
+        }
+
+        // For Drupal 8+
+        if (class_exists('\Drupal')) {
+            return \Drupal::request()->getSchemeAndHttpHost() . \Drupal::request()->getBaseUrl();
+        }
+
+        // Fallback
+        return 'Unknown';
+    }
+
+    protected function extractDatabaseSizeInfo($result)
+    {
+        foreach ($result['reports'] as $report) {
+            if (isset($report['checks'])) {
+                foreach ($report['checks'] as $checkKey => $check) {
+                    if (strpos($checkKey, 'DatabaseSize') !== false) {
+                        $info = [];
+                        $resultLines = explode('<br>', $check['result']);
+                        foreach ($resultLines as $line) {
+                            $parts = explode(': ', $line, 2);
+                            if (count($parts) == 2) {
+                                $info[trim($parts[0])] = trim($parts[1]);
+                            }
+                        }
+                        $info['score'] = $check['score'];
+                        $info['action'] = $check['action'] ?? null;
+                        return $info;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    protected function generateHtmlReport($result)
+    {
+        $html = "<html><head><title>Site Audit Report</title></head><body>";
+        $html .= "<h1>Site Audit Report</h1>";
+        $html .= "<p>Generated on: " . date('Y-m-d H:i:s', $result['time']) . "</p>";
+
+        // Add environment information
+        $html .= "<h2>Environment Information</h2>";
+        $html .= "<table border='1'><tr><th>Key</th><th>Value</th></tr>";
+        $html .= "<tr><td>Environment</td><td>" . $this->getEnvironment() . "</td></tr>";
+        $html .= "<tr><td>Site URI</td><td>" . $this->getSiteUri() . "</td></tr>";
+        $html .= "</table>";
+
+        // Add database size information
+        if (isset($result['database_size_info'])) {
+            $html .= "<h2>Database Size Information</h2>";
+            $html .= "<table border='1'><tr><th>Metric</th><th>Value</th></tr>";
+            foreach ($result['database_size_info'] as $key => $value) {
+                if ($key !== 'score' && $key !== 'action') {
+                    $html .= "<tr><td>$key</td><td>$value</td></tr>";
+                }
+            }
+            $html .= "</table>";
+
+            if ($result['database_size_info']['score'] == SiteAuditCheckBase::AUDIT_CHECK_SCORE_WARN) {
+                $html .= "<p><strong>Warning:</strong> High cache table usage detected.</p>";
+            }
+
+            if (!empty($result['database_size_info']['action'])) {
+                $html .= "<p><strong>Recommended Action:</strong> " . $result['database_size_info']['action'] . "</p>";
+            }
+        }
+
+        // Add other reports
+        foreach ($result['reports'] as $reportKey => $report) {
+            $html .= "<h2>" . $report['label'] . "</h2>";
+            $html .= "<p>Overall Score: " . $report['percent'] . "%</p>";
+
+            foreach ($report['checks'] as $checkKey => $check) {
+                if (strpos($checkKey, 'DatabaseSize') === false) {  // Skip DatabaseSize as it's already included
+                    $html .= "<h3>" . $check['label'] . "</h3>";
+                    $html .= "<p><strong>Result:</strong> " . $check['result'] . "</p>";
+                    
+                    if (!empty($check['action'])) {
+                        $html .= "<p><strong>Action:</strong> " . $check['action'] . "</p>";
+                    }
+
+                    if (!empty($check['description'])) {
+                        $html .= "<p><strong>Description:</strong> " . $check['description'] . "</p>";
+                    }
+
+                    $html .= "<p><strong>Score:</strong> " . $this->getScoreEmoji($check['score']) . "</p>";
+                }
+            }
+        }
+
+        $html .= "</body></html>";
+        return $html;
     }
 }
