@@ -97,40 +97,33 @@ class BestPracticesMultisite extends SiteAuditCheckBase {
    * {@inheritdoc}.
    */
   public function calculateScore() {
-    $this->checkInvokeCalculateScore('best_practices_sites');
-    $handle = opendir(DRUPAL_ROOT . '/sites/');
-    $this->registry->multisites = array();
-    while (FALSE !== ($entry = readdir($handle))) {
-      if (!in_array($entry, array(
-        '.',
-        '..',
-        'default',
-        'all',
-        'example.sites.php',
-        'README.txt',
-        '.svn',
-        '.DS_Store',
-      ))
-      ) {
-        if (is_dir(DRUPAL_ROOT . '/sites/' . $entry)) {
-          $this->registry->multisites[] = $entry;
+    $unrecommended_modules = array(
+        'php',
+    );
+
+    $enabled_unrecommended_modules = [];
+
+    if ($this->isDrupal7()) {
+        $modules = module_list();
+        foreach ($unrecommended_modules as $unrecommended_module) {
+            if (isset($modules[$unrecommended_module])) {
+                $enabled_unrecommended_modules[] = $unrecommended_module;
+            }
         }
-      }
+    } else {
+        $modules = \Drupal::moduleHandler()->getModuleList();
+        foreach ($unrecommended_modules as $unrecommended_module) {
+            if (isset($modules[$unrecommended_module])) {
+                $enabled_unrecommended_modules[] = $unrecommended_module;
+            }
+        }
     }
-    closedir($handle);
-    if ($this->registry->multisite_enabled) {
-      if ($this->registry->vendor == 'pantheon') {
-        return SiteAuditCheckBase::AUDIT_CHECK_SCORE_FAIL;
-      }
-      if (!empty($this->registry->multisites)) {
-        return SiteAuditCheckBase::AUDIT_CHECK_SCORE_INFO;
-      }
-      return SiteAuditCheckBase::AUDIT_CHECK_SCORE_WARN;
-    }
-    elseif (!empty($this->registry->multisites)) {
-      return SiteAuditCheckBase::AUDIT_CHECK_SCORE_WARN;
+
+    if (!empty($enabled_unrecommended_modules)) {
+        return SiteAuditCheckBase::AUDIT_CHECK_SCORE_WARN;
     }
     return SiteAuditCheckBase::AUDIT_CHECK_SCORE_PASS;
   }
 
 }
+

@@ -81,7 +81,11 @@ class CachePreprocessJS extends SiteAuditCheckBase {
    * {@inheritdoc}.
    */
   public function calculateScore() {
-    $config = \Drupal::config('system.performance')->get('js.preprocess');
+    if ($this->isDrupal7()) {
+      $config = variable_get('preprocess_js', 0);
+    } else {
+      $config = \Drupal::config('system.performance')->get('js.preprocess');
+    }
     if ($config) {
       return SiteAuditCheckBase::AUDIT_CHECK_SCORE_PASS;
     }

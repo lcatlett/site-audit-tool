@@ -115,23 +115,27 @@ class DatabaseSize extends SiteAuditCheckBase
    */
   public function calculateScore()
   {
-    $connection = \Drupal\Core\Database\Database::getConnection();
     try {
-      $this->totalSize = $this->getDatabaseSize($connection);
-      $this->cacheSize = $this->getCacheTablesSize($connection);
+        if ($this->isDrupal7()) {
+            $connection = Database::getConnection();
+        } else {
+            $connection = \Drupal\Core\Database\Database::getConnection();
+        }
+        $this->totalSize = $this->getDatabaseSize($connection);
+        $this->cacheSize = $this->getCacheTablesSize($connection);
 
-      if (!$this->totalSize) {
-        $this->abort = TRUE;
-        return SiteAuditCheckBase::AUDIT_CHECK_SCORE_FAIL;
-      }
+        if (!$this->totalSize) {
+            $this->abort = TRUE;
+            return SiteAuditCheckBase::AUDIT_CHECK_SCORE_FAIL;
+        }
 
-      if (($this->cacheSize / $this->totalSize) > 0.2) {
-        return SiteAuditCheckBase::AUDIT_CHECK_SCORE_WARN;
-      }
+        if (($this->cacheSize / $this->totalSize) > 0.2) {
+            return SiteAuditCheckBase::AUDIT_CHECK_SCORE_WARN;
+        }
 
-      return SiteAuditCheckBase::AUDIT_CHECK_SCORE_INFO;
+        return SiteAuditCheckBase::AUDIT_CHECK_SCORE_INFO;
     } catch (Exception $e) {
-      return SiteAuditCheckBase::AUDIT_CHECK_SCORE_FAIL;
+        return SiteAuditCheckBase::AUDIT_CHECK_SCORE_FAIL;
     }
   }
 

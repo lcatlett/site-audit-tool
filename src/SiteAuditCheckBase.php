@@ -300,4 +300,9 @@ abstract class SiteAuditCheckBase implements SiteAuditCheckInterface {
     );
   }
 
+  protected function isDrupal7()
+  {
+    return !class_exists('\Drupal');
+  }
+
 }

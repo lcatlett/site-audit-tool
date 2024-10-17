@@ -74,7 +74,11 @@ class SiteAuditCommands extends DrushCommands
     {
         $this->init();
 
-        $settings_excludes = \Drupal::config('site_audit')->get('opt_out');
+        if ($this->isDrupal7()) {
+            $settings_excludes = variable_get('site_audit_opt_out', array());
+        } else {
+            $settings_excludes = \Drupal::config('site_audit')->get('opt_out');
+        }
         $skipped = [];
 
         // The skip parameter is almost always an array, even when the single
@@ -884,12 +888,16 @@ class SiteAuditCommands extends DrushCommands
 
     protected function getSiteUri()
     {
-        // For Drupal 7
-        if (function_exists('variable_get')) {
-            $base_url = variable_get('site_url', '');
-            if ($base_url) {
-                return $base_url;
+        if ($this->isDrupal7()) {
+            if (function_exists('variable_get')) {
+                $base_url = variable_get('site_url', '');
+                if ($base_url) {
+                    return $base_url;
+                }
             }
+            // Fallback for Drupal 7
+            global $base_url;
+            return $base_url;
         }
 
         // For Drupal 8+
@@ -983,5 +991,10 @@ class SiteAuditCommands extends DrushCommands
     
         $html .= "</body></html>";
         return $html;
+    }
+
+    protected function isDrupal7()
+    {
+        return !class_exists('\Drupal');
     }
 }

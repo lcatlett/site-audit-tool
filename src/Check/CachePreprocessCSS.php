@@ -81,12 +81,16 @@ class CachePreprocessCSS extends SiteAuditCheckBase {
    * {@inheritdoc}.
    */
   public function calculateScore() {
-    $config = \Drupal::config('system.performance')->get('css.preprocess');
+    if ($this->isDrupal7()) {
+        $config = variable_get('preprocess_css', 0);
+    } else {
+        $config = \Drupal::config('system.performance')->get('css.preprocess');
+    }
     if ($config) {
-      return SiteAuditCheckBase::AUDIT_CHECK_SCORE_PASS;
+        return SiteAuditCheckBase::AUDIT_CHECK_SCORE_PASS;
     }
     if (SiteAuditEnvironment::isDev()) {
-      return SiteAuditCheckBase::AUDIT_CHECK_SCORE_INFO;
+        return SiteAuditCheckBase::AUDIT_CHECK_SCORE_INFO;
     }
     return SiteAuditCheckBase::AUDIT_CHECK_SCORE_FAIL;
   }
