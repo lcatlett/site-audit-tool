@@ -92,8 +92,12 @@ class ExtensionsCount extends SiteAuditCheckBase {
    */
   public function calculateScore() {
     if (!isset($this->registry->extensions) || empty($this->registry->extensions)) {
-      $moduleHandler = \Drupal::service('module_handler');
-      $this->registry->extensions = $moduleHandler->getModuleList();
+      if ($this->isDrupal7()) {
+        $this->registry->extensions = module_list();
+      } else {
+        $moduleHandler = \Drupal::service('module_handler');
+        $this->registry->extensions = $moduleHandler->getModuleList();
+      }
     }
 
     $this->registry->extension_count = count($this->registry->extensions);
@@ -104,4 +108,13 @@ class ExtensionsCount extends SiteAuditCheckBase {
     return SiteAuditCheckBase::AUDIT_CHECK_SCORE_PASS;
   }
 
+  /**
+   * Check if the current Drupal version is 7.
+   *
+   * @return bool
+   *   TRUE if Drupal 7, FALSE otherwise.
+   */
+  protected function isDrupal7() {
+    return version_compare(VERSION, '8.0', '<');
+  }
 }
