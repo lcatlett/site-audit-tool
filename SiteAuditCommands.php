@@ -966,21 +966,21 @@ class SiteAuditCommands extends DrushCommands
             foreach ($report['checks'] as $checkKey => $check) {
                 if (strpos($checkKey, 'DatabaseSize') === false) {  // Skip DatabaseSize as it's already included
                     $html .= "<h3>" . $check['label'] . "</h3>";
-                    $html .= "<p><strong>Result:</strong> " . $check['result'] . "</p>";
+                    $html .= "<p><strong>Result:</strong> " . ($check['result'] ?? 'N/A') . "</p>";
                     
                     if (!empty($check['action'])) {
                         $html .= "<p><strong>Action:</strong> " . $check['action'] . "</p>";
                     }
-
+    
                     if (!empty($check['description'])) {
                         $html .= "<p><strong>Description:</strong> " . $check['description'] . "</p>";
                     }
-
+    
                     $html .= "<p><strong>Score:</strong> " . $this->getScoreEmoji($check['score']) . "</p>";
                 }
             }
         }
-
+    
         $html .= "</body></html>";
         return $html;
     }
