@@ -115,22 +115,22 @@ class DatabaseSize extends SiteAuditCheckBase
   public function calculateScore()
   {
     try {
-        $connection = $this->getDatabaseConnection();
-        $this->totalSize = $this->getDatabaseSize($connection);
-        $this->cacheSize = $this->getCacheTablesSize($connection);
+      $connection = $this->getDatabaseConnection();
+      $this->totalSize = $this->getDatabaseSize($connection);
+      $this->cacheSize = $this->getCacheTablesSize($connection);
 
-        if (!$this->totalSize) {
-            $this->abort = TRUE;
-            return SiteAuditCheckBase::AUDIT_CHECK_SCORE_FAIL;
-        }
-
-        if (($this->cacheSize / $this->totalSize) > 0.2) {
-            return SiteAuditCheckBase::AUDIT_CHECK_SCORE_WARN;
-        }
-
-        return SiteAuditCheckBase::AUDIT_CHECK_SCORE_INFO;
-    } catch (Exception $e) {
+      if (!$this->totalSize) {
+        $this->abort = TRUE;
         return SiteAuditCheckBase::AUDIT_CHECK_SCORE_FAIL;
+      }
+
+      if (($this->cacheSize / $this->totalSize) > 0.2) {
+        return SiteAuditCheckBase::AUDIT_CHECK_SCORE_WARN;
+      }
+
+      return SiteAuditCheckBase::AUDIT_CHECK_SCORE_INFO;
+    } catch (Exception $e) {
+      return SiteAuditCheckBase::AUDIT_CHECK_SCORE_FAIL;
     }
   }
 
@@ -160,10 +160,17 @@ class DatabaseSize extends SiteAuditCheckBase
    */
   protected function getDatabaseSize($connection)
   {
-    $query = $connection->select('information_schema.TABLES', 'ist');
-    $query->addExpression('SUM(ist.data_length + ist.index_length)');
-    $query->condition('ist.table_schema', $connection->getConnectionOptions()['database']);
-    return (float) $query->execute()->fetchField();
+    if ($this->isDrupal7()) {
+      $query = db_query("SELECT SUM(data_length + index_length) FROM information_schema.TABLES WHERE table_schema = :database", [
+        ':database' => $connection->getConnectionOptions()['database'],
+      ]);
+      return (float) $query->fetchField();
+    } else {
+      $query = $connection->select('information_schema.TABLES', 'ist');
+      $query->addExpression('SUM(ist.data_length + ist.index_length)');
+      $query->condition('ist.table_schema', $connection->getConnectionOptions()['database']);
+      return (float) $query->execute()->fetchField();
+    }
   }
 
   /**
@@ -177,10 +184,17 @@ class DatabaseSize extends SiteAuditCheckBase
    */
   protected function getCacheTablesSize($connection)
   {
-    $query = $connection->select('information_schema.TABLES', 'ist');
-    $query->addExpression('SUM(ist.data_length + ist.index_length)');
-    $query->condition('ist.table_schema', $connection->getConnectionOptions()['database']);
-    $query->condition('ist.table_name', 'cache%', 'LIKE');
-    return (float) $query->execute()->fetchField();
+    if ($this->isDrupal7()) {
+      $query = db_query("SELECT SUM(data_length + index_length) FROM information_schema.TABLES WHERE table_schema = :database AND table_name LIKE 'cache%'", [
+        ':database' => $connection->getConnectionOptions()['database'],
+      ]);
+      return (float) $query->fetchField();
+    } else {
+      $query = $connection->select('information_schema.TABLES', 'ist');
+      $query->addExpression('SUM(ist.data_length + ist.index_length)');
+      $query->condition('ist.table_schema', $connection->getConnectionOptions()['database']);
+      $query->condition('ist.table_name', 'cache%', 'LIKE');
+      return (float) $query->execute()->fetchField();
+    }
   }
 }
