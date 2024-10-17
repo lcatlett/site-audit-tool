@@ -75,7 +75,7 @@ class CacheBinsAll extends SiteAuditCheckBase {
     $this->registry->cache_bins_all = array();
 
     if ($this->isDrupal7()) {
-      $query = db_query("SHOW TABLES LIKE 'cache' UNION SHOW TABLES LIKE 'cache_%'");
+      $query = db_query("SHOW TABLES LIKE 'cache%'");
       foreach ($query as $row) {
         $table_name = reset($row);
         $this->registry->cache_bins_all[$table_name] = 'DrupalDatabaseCache';
