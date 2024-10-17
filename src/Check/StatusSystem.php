@@ -101,10 +101,11 @@ class StatusSystem extends SiteAuditCheckBase
           $item[$key] = RenderHelper::render($value);
         }
       } else {
-        $item = RenderHelper::render($requirement['title']) . ': ' . $severity;
-        if (isset($requirement['value']) && $requirement['value']) {
-          $item .= ' - ' . RenderHelper::render($requirement['value']);
-        }
+        $item = [
+          'title' => RenderHelper::render($requirement['title']),
+          'severity' => $severity,
+          'value' => isset($requirement['value']) ? RenderHelper::render($requirement['value']) : ''
+        ];
       }
       $items[] = $item;
     }
@@ -123,9 +124,11 @@ class StatusSystem extends SiteAuditCheckBase
       $ret_val .= '</tbody>';
       $ret_val .= '</table>';
     } else {
-      $separator = PHP_EOL;
-      $separator .= str_repeat(' ', 4);
-      $ret_val = implode($separator, $items);
+      $ret_val = "| Title | Severity | Value |\n";
+      $ret_val .= "|-------|----------|-------|\n";
+      foreach ($items as $item) {
+        $ret_val .= "| " . $item['title'] . " | " . $item['severity'] . " | " . $item['value'] . " |\n";
+      }
     }
     return $ret_val;
   }
