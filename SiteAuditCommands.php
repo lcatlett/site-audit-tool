@@ -125,12 +125,14 @@ class SiteAuditCommands extends DrushCommands
     /**
      * @hook option audit:reports
      */
-    public function optionEnvVars(array &$options)
+    public function optionEnvVars(\Consolidation\AnnotatedCommand\AnnotatedCommand $command)
     {
-        $options['env-vars'] = [
-            'description' => 'Include environment variables report.',
-            'default' => false,
-        ];
+        $command->addOption(
+            'env-vars',
+            null,
+            InputOption::VALUE_NONE,
+            'Include environment variables report.'
+        );
     }
     /**
      * @command audit:best-practices
