@@ -102,8 +102,9 @@ class BestPracticesFolderStructure extends SiteAuditCheckBase {
    * {@inheritdoc}.
    */
   public function calculateScore() {
+    $drupalRoot = $this->isDrupal7() ? DRUPAL_ROOT : \Drupal::root();
     $subDirs = glob(
-        sprintf('%s/modules/*', DRUPAL_ROOT),
+        sprintf('%s/modules/*', $drupalRoot),
         GLOB_ONLYDIR
     );
     if (!$subDirs) {

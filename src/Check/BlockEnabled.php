@@ -78,6 +78,32 @@ class BlockEnabled extends SiteAuditCheckBase {
    * {@inheritdoc}.
    */
   public function calculateScore() {
+    if ($this->isDrupal7()) {
+      return $this->calculateScoreDrupal7();
+    } else {
+      return $this->calculateScoreDrupal8Plus();
+    }
+  }
+
+  /**
+   * Calculate score for Drupal 7.
+   */
+  private function calculateScoreDrupal7() {
+    if (!module_exists('block')) {
+      $this->abort = TRUE;
+      return SiteAuditCheckBase::AUDIT_CHECK_SCORE_INFO;
+    }
+    $this->registry->theme_default = variable_get('theme_default', NULL);
+    if (!$this->registry->theme_default) {
+      return SiteAuditCheckBase::AUDIT_CHECK_SCORE_WARN;
+    }
+    return SiteAuditCheckBase::AUDIT_CHECK_SCORE_PASS;
+  }
+
+  /**
+   * Calculate score for Drupal 8+.
+   */
+  private function calculateScoreDrupal8Plus() {
     if (!\Drupal::service('module_handler')->moduleExists('block')) {
       $this->abort = TRUE;
       return SiteAuditCheckBase::AUDIT_CHECK_SCORE_INFO;
