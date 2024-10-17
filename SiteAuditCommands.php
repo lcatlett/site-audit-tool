@@ -12,6 +12,7 @@ use SiteAudit\SiteAuditCheckBase;
 use SiteAudit\SiteAuditCheckInterface;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
+use Consolidation\AnnotatedCommand\AnnotatedCommand;
 
 /**
  * Edit this file to reflect your organization's needs.
